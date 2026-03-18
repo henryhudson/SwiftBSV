@@ -57,8 +57,8 @@ public struct BitcoinSignedMessage {
         sig += signature.s
 
         let publicKeyBytes = try! Secp256k1.recoverCompact(
-            msg: hashBuf.bytes,
-            sig: sig.bytes,
+            msg: [UInt8](hashBuf),
+            sig: [UInt8](sig),
             recID: Secp256k1.RecoveryID(signature.recovery!),
             compression: signature.isCompressed! ? .compressed : .uncompressed
         )
@@ -68,8 +68,8 @@ public struct BitcoinSignedMessage {
         }
 
         guard Secp256k1.verifyCompact(
-            msg: hashBuf.bytes,
-            sig: sig.bytes,
+            msg: [UInt8](hashBuf),
+            sig: [UInt8](sig),
             pubkey: publicKeyBytes
         ) == true else {
             return false

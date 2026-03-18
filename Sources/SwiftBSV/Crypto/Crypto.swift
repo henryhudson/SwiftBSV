@@ -38,7 +38,7 @@ public final class Crypto {
    public static func hmacsha512(key: Data, data: Data) -> Data {
         let output: [UInt8]
         do {
-            output = try HMAC(key: key.bytes, variant: .sha512).authenticate(data.bytes)
+            output = try HMAC(key: [UInt8](key), variant: .sha512).authenticate([UInt8](data))
         } catch let error {
             fatalError("Error occured. Description: \(error.localizedDescription)")
         }
@@ -56,7 +56,7 @@ public final class Crypto {
 //    }
 
     public static func sha3keccak256(data:Data) -> Data {
-        return Data(SHA3(variant: .keccak256).calculate(for: data.bytes))
+        return Data(SHA3(variant: .keccak256).calculate(for: [UInt8](data)))
     }
 //
 //    public static func hashSHA3_256(_ data: Data) -> Data {
@@ -65,7 +65,7 @@ public final class Crypto {
 
     public static func sign(_ message: Data, privateKey: PrivateKey) -> Data {
 
-        let sig_ = try! Secp256k1.sign(msg: message.bytes, with: privateKey.data.bytes, nonceFunction: Secp256k1.NonceFunction.rfc6979)
+        let sig_ = try! Secp256k1.sign(msg: [UInt8](message), with: [UInt8](privateKey.data), nonceFunction: Secp256k1.NonceFunction.rfc6979)
         let sig = Data(sig_)
 
         let a = try! ECDSA.signMessage(message, withPrivateKey: privateKey.data)
@@ -77,7 +77,7 @@ public final class Crypto {
     }
 
     public static func signCompact(_ message: Data, privateKey: PrivateKey) -> (sig: Data, recoveryId: Int32) {
-        let compact = try! Secp256k1.signCompact(msg: message.bytes, with: privateKey.data.bytes, nonceFunction: Secp256k1.NonceFunction.rfc6979)
+        let compact = try! Secp256k1.signCompact(msg: [UInt8](message), with: [UInt8](privateKey.data), nonceFunction: Secp256k1.NonceFunction.rfc6979)
 
         return (sig: Data(compact.sig), recoveryId: compact.recID)
     }

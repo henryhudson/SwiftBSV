@@ -83,7 +83,7 @@ public struct Bip32 {
         guard data.count == 78 else { return nil }
 
         versionPrefix = data[0..<4].to(type: UInt32.self).bigEndian
-        depth = data[4..<5].bytes[0]
+        depth = data[data.startIndex + 4]
         fingerprint = data[5..<9].to(type: UInt32.self)
         childIndex = data[9..<13].to(type: UInt32.self)
         chainCode = data[13..<45]

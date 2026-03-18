@@ -125,8 +125,8 @@ struct Signature {
     func toDer() -> Data {
         let r = self.r
         let s = self.s
-        let rneg = r.bytes[0] & 0x80
-        let sneg = s.bytes[0] & 0x80
+        let rneg = r[r.startIndex] & 0x80
+        let sneg = s[s.startIndex] & 0x80
 
         var rbuf = Data()
         if rneg == 1 {
