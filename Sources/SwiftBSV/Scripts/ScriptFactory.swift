@@ -31,6 +31,7 @@ public struct ScriptFactory {
     public struct MultiSig {}
     public struct OpReturn {}
     public struct Condition {}
+    public struct PushDrop {}
 
     // Contract
     public struct HashedTimeLockedContract {}
@@ -44,9 +45,16 @@ public extension ScriptFactory.Standard {
             .append(.OP_CHECKSIG)
     }
 
-//    static func buildP2PKH(address: Address) -> Script? {
-//        return Script(address: address)
-//    }
+    /// Build a P2PKH locking script from an Address.
+    /// Format: OP_DUP OP_HASH160 <pubKeyHash> OP_EQUALVERIFY OP_CHECKSIG
+    static func buildP2PKH(address: Address) -> Script {
+        return Script.buildPublicKeyHashOut(pubKeyHash: address.hashBuffer)
+    }
+
+    /// Build a P2PKH locking script from a public key.
+    static func buildP2PKH(publicKey: PublicKey) -> Script {
+        return Script.buildPublicKeyHashOut(pubKeyHash: publicKey.address.hashBuffer)
+    }
 
     static func buildP2SH(script: Script) -> Script {
         return script.toP2SH()
@@ -95,6 +103,8 @@ public extension ScriptFactory.LockTime {
 
 // MARK: - OpReturn
 public extension ScriptFactory.OpReturn {
+    /// Build an OP_RETURN script from a text string.
+    /// Format: OP_RETURN <utf8 data>
     static func build(text: String) -> Script? {
         let MAX_OP_RETURN_DATA_SIZE: Int = 220
         guard let data = text.data(using: .utf8), data.count <= MAX_OP_RETURN_DATA_SIZE else {
@@ -103,6 +113,62 @@ public extension ScriptFactory.OpReturn {
         return try? Script()
             .append(.OP_RETURN)
             .appendData(data)
+    }
+
+    /// Build a safe (unspendable) OP_RETURN script from raw data.
+    /// Format: OP_FALSE OP_RETURN <data>
+    /// The OP_FALSE prefix makes this provably unspendable (BIP 141 convention).
+    static func buildSafe(data: Data) -> Script? {
+        return try? Script()
+            .append(.OP_0)
+            .append(.OP_RETURN)
+            .appendData(data)
+    }
+
+    /// Build a safe OP_RETURN with multiple data pushes.
+    /// Format: OP_FALSE OP_RETURN <data1> <data2> ...
+    /// Used by protocols like B://, MAP, and 1Sat Ordinals.
+    static func buildSafe(pushes: [Data]) -> Script? {
+        guard !pushes.isEmpty else { return nil }
+        var script = try? Script()
+            .append(.OP_0)
+            .append(.OP_RETURN)
+        for push in pushes {
+            script = try? script?.appendData(push)
+        }
+        return script
+    }
+
+    /// Build a safe OP_RETURN from a text string.
+    /// Format: OP_FALSE OP_RETURN <utf8 data>
+    static func buildSafe(text: String) -> Script? {
+        guard let data = text.data(using: .utf8) else { return nil }
+        return buildSafe(data: data)
+    }
+}
+
+// MARK: - PushDrop
+public extension ScriptFactory.PushDrop {
+    /// Build a PushDrop script (1Sat Ordinals / token protocols).
+    /// Format: <data1> <data2> ... OP_DROP ... OP_DROP <lockingScript>
+    /// The data pushes are dropped during execution, leaving only the locking script.
+    /// Used to attach arbitrary data to a UTXO while preserving spendability.
+    static func build(pushes: [Data], lockingScript: Script) -> Script? {
+        guard !pushes.isEmpty else { return nil }
+        var script = Script()
+        do {
+            for push in pushes {
+                try script.appendData(push)
+            }
+            // Drop all but the last push, which serves as part of the execution
+            for _ in 0..<pushes.count {
+                try script.append(.OP_DROP)
+            }
+            try script.appendScript(lockingScript)
+            return script
+        } catch {
+            return nil
+        }
     }
 }
 
