@@ -8,12 +8,17 @@
 
 import Foundation
 
-// Transaction is invalid unless occuring in an unexecuted OP_IF branch
+// Chronicle upgrade: OP_VERIF — version-conditional IF.
+// Equivalent to OP_VER OP_GREATERTHANOREQUAL OP_IF.
 public struct OpVerIf: OpCodeProtocol {
     public var value: UInt8 { return 0x65 }
     public var name: String { return "OP_VERIF" }
 
     public func mainProcess(_ context: ScriptExecutionContext) throws {
-        throw OpCodeExecutionError.error("OP_VERIF should not be executed.")
+        try context.assertStackHeightGreaterThanOrEqual(1)
+        let threshold = try context.number(at: -1)
+        context.stack.removeLast()
+        let version: Int32 = Int32(context.transaction?.version ?? 1)
+        try context.pushToStack(version >= threshold ? 1 : 0)
     }
 }

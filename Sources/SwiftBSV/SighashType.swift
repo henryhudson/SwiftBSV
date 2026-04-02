@@ -11,6 +11,7 @@ import Foundation
 private let SIGHASH_ALL: UInt8 = 0x01 // 00000001
 private let SIGHASH_NONE: UInt8 = 0x02 // 00000010
 private let SIGHASH_SINGLE: UInt8 = 0x03 // 00000011
+private let SIGHASH_CHRONICLE: UInt8 = 0x20 // 00100000 — Chronicle upgrade: use original tx digest
 private let SIGHASH_FORK_ID: UInt8 = 0x40 // 01000000
 private let SIGHASH_ANYONECANPAY: UInt8 = 0x80 // 10000000
 
@@ -64,6 +65,10 @@ public struct SighashType {
     public var hasForkId: Bool {
         return (sighash & UInt32(SIGHASH_FORK_ID)) != 0
     }
+    /// Chronicle upgrade: when set, use the original (pre-BIP143) transaction digest algorithm
+    public var hasChronicle: Bool {
+        return (sighash & UInt32(SIGHASH_CHRONICLE)) != 0
+    }
     public var hasAnyoneCanPay: Bool {
         return (sighash & UInt32(SIGHASH_ANYONECANPAY)) != 0
     }
@@ -104,6 +109,11 @@ public struct SighashType {
 
     public func withAnyoneCanPay(anyoneCanPay: Bool) -> Self {
         return Self.init(sighash: (sighash & ~UInt32(SIGHASH_ANYONECANPAY)) | (anyoneCanPay ? UInt32(SIGHASH_ANYONECANPAY) : 0))
+    }
+
+    /// Chronicle upgrade: use the original transaction digest algorithm (OTDA)
+    public func withChronicle(chronicle: Bool) -> Self {
+        return Self.init(sighash: (sighash & ~UInt32(SIGHASH_CHRONICLE)) | (chronicle ? UInt32(SIGHASH_CHRONICLE) : 0))
     }
 
 }

@@ -33,48 +33,96 @@ public struct OpNop1: OpCodeProtocol {
     }
 }
 
+// Chronicle upgrade: OP_SUBSTR (0xb3) — substring by start index and length
 public struct OpNop4: OpCodeProtocol {
     public var value: UInt8 { return 0xb3 }
-    public var name: String { return "OP_NOP4" }
+    public var name: String { return "OP_SUBSTR" }
 
+    // (data start length -- substring)
     public func mainProcess(_ context: ScriptExecutionContext) throws {
-        // do nothing
+        try context.assertStackHeightGreaterThanOrEqual(3)
+        let length = try context.number(at: -1)
+        let start = try context.number(at: -2)
+        let data: Data = context.data(at: -3)
+        guard start >= 0 && length >= 0 && Int(start + length) <= data.count else {
+            throw OpCodeExecutionError.error("Invalid OP_SUBSTR range")
+        }
+        context.stack.removeLast(3)
+        context.stack.append(Data(data[Int(start)..<Int(start + length)]))
     }
 }
 
+// Chronicle upgrade: OP_LEFT (0xb4) — extract leftmost N bytes
 public struct OpNop5: OpCodeProtocol {
     public var value: UInt8 { return 0xb4 }
-    public var name: String { return "OP_NOP5" }
+    public var name: String { return "OP_LEFT" }
 
+    // (data n -- left)
     public func mainProcess(_ context: ScriptExecutionContext) throws {
-        // do nothing
+        try context.assertStackHeightGreaterThanOrEqual(2)
+        let n = try context.number(at: -1)
+        let data: Data = context.data(at: -2)
+        guard n >= 0 && Int(n) <= data.count else {
+            throw OpCodeExecutionError.error("Invalid OP_LEFT size")
+        }
+        context.stack.removeLast(2)
+        context.stack.append(Data(data.prefix(Int(n))))
     }
 }
 
+// Chronicle upgrade: OP_RIGHT (0xb5) — extract rightmost N bytes
 public struct OpNop6: OpCodeProtocol {
     public var value: UInt8 { return 0xb5 }
-    public var name: String { return "OP_NOP6" }
+    public var name: String { return "OP_RIGHT" }
 
+    // (data n -- right)
     public func mainProcess(_ context: ScriptExecutionContext) throws {
-        // do nothing
+        try context.assertStackHeightGreaterThanOrEqual(2)
+        let n = try context.number(at: -1)
+        let data: Data = context.data(at: -2)
+        guard n >= 0 && Int(n) <= data.count else {
+            throw OpCodeExecutionError.error("Invalid OP_RIGHT size")
+        }
+        context.stack.removeLast(2)
+        context.stack.append(Data(data.suffix(Int(n))))
     }
 }
 
+// Chronicle upgrade: OP_LSHIFTNUM (0xb6) — numeric left shift preserving sign
 public struct OpNop7: OpCodeProtocol {
     public var value: UInt8 { return 0xb6 }
-    public var name: String { return "OP_NOP8" }
+    public var name: String { return "OP_LSHIFTNUM" }
 
+    // (n shift -- result)
     public func mainProcess(_ context: ScriptExecutionContext) throws {
-        // do nothing
+        try context.assertStackHeightGreaterThanOrEqual(2)
+        let shift = try context.number(at: -1)
+        let value = try context.number(at: -2)
+        guard shift >= 0 else {
+            throw OpCodeExecutionError.error("Negative shift in OP_LSHIFTNUM")
+        }
+        context.stack.removeLast(2)
+        let magnitude = abs(value) << shift
+        try context.pushToStack(value < 0 ? -magnitude : magnitude)
     }
 }
 
+// Chronicle upgrade: OP_RSHIFTNUM (0xb7) — numeric right shift preserving sign
 public struct OpNop8: OpCodeProtocol {
     public var value: UInt8 { return 0xb7 }
-    public var name: String { return "OP_NOP8" }
+    public var name: String { return "OP_RSHIFTNUM" }
 
+    // (n shift -- result)
     public func mainProcess(_ context: ScriptExecutionContext) throws {
-        // do nothing
+        try context.assertStackHeightGreaterThanOrEqual(2)
+        let shift = try context.number(at: -1)
+        let value = try context.number(at: -2)
+        guard shift >= 0 else {
+            throw OpCodeExecutionError.error("Negative shift in OP_RSHIFTNUM")
+        }
+        context.stack.removeLast(2)
+        let magnitude = abs(value) >> shift
+        try context.pushToStack(value < 0 ? -magnitude : magnitude)
     }
 }
 

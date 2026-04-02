@@ -23,14 +23,10 @@
 //
 import Foundation
 
-// The input is divided by 2. disabled.
+// The input is divided by 2. Re-enabled by Chronicle upgrade.
 public struct Op2Div: OpCodeProtocol {
     public var value: UInt8 { return 0x8e }
     public var name: String { return "OP_2DIV" }
-
-    public func isEnabled() -> Bool {
-        return false
-    }
 
     // (in -- out)
      public func mainProcess(_ context: ScriptExecutionContext) throws {

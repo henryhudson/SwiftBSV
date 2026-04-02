@@ -8,11 +8,14 @@
 
 import Foundation
 
+// Chronicle upgrade: OP_VER pushes the transaction version onto the stack.
 public struct OpVer: OpCodeProtocol {
     public var value: UInt8 { return 0x62 }
     public var name: String { return "OP_VER" }
 
     public func mainProcess(_ context: ScriptExecutionContext) throws {
-        throw OpCodeExecutionError.error("OP_VER should not be executed.")
+        // Push transaction version (4-byte LE). Default to 1 if not set.
+        let version: Int32 = Int32(context.transaction?.version ?? 1)
+        try context.pushToStack(version)
     }
 }

@@ -100,7 +100,7 @@ public struct ECIESEncryption {
         recipientPrivateKey: PrivateKey
     ) throws -> Data {
         // Minimum: 4 (magic) + 33 (pubkey) + 16 (min AES block) + 32 (hmac) = 85
-        guard ciphertext.count >= 69 else {
+        guard ciphertext.count >= 85 else {
             throw ECIESError.invalidCiphertext
         }
 

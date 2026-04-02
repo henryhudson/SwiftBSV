@@ -23,14 +23,10 @@
 //
 import Foundation
 
-// The input is multiplied by 2. disabled.
+// The input is multiplied by 2. Re-enabled by Chronicle upgrade.
 public struct Op2Mul: OpCodeProtocol {
     public var value: UInt8 { return 0x8d }
     public var name: String { return "OP_2MUL" }
-
-    public func isEnabled() -> Bool {
-        return false
-    }
 
     // (in -- out)
      public func mainProcess(_ context: ScriptExecutionContext) throws {

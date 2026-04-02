@@ -23,14 +23,10 @@
 //
 import Foundation
 
-// (x y -- x<<y) disabled.
+// (x y -- x<<y) Re-enabled by Chronicle upgrade.
 public struct OpLShift: OpCodeProtocol {
     public var value: UInt8 { return 0x98 }
     public var name: String { return "OP_LSHIFT" }
-
-    public func isEnabled() -> Bool {
-        return false
-    }
 
     // (x1 x2 -- out)
      public func mainProcess(_ context: ScriptExecutionContext) throws {
