@@ -129,6 +129,13 @@ public enum SPVError: Error, LocalizedError {
     case networkError(String)
     case txNotInBlock
     case invalidBlockHash
+    /// The transaction's containing block is outside the caller's
+    /// locally-validated header range. Distinct from `.blockHeaderNotFound`
+    /// (which means "the header is genuinely missing") — callers should
+    /// treat this as "come back when sync catches up" and show a pending
+    /// UI instead of a failure UI. Associated values: the required block
+    /// height and the local validated tip height at the time of the check.
+    case headerChainNotSynced(requiredHeight: Int, localTip: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -139,6 +146,8 @@ public enum SPVError: Error, LocalizedError {
         case .networkError(let message): return "Network error: \(message)"
         case .txNotInBlock: return "Merkle proof not available for this transaction"
         case .invalidBlockHash: return "Invalid block hash"
+        case .headerChainNotSynced(let required, let local):
+            return "Header chain still syncing — block \(required) not yet reached (local tip \(local))"
         }
     }
 }
