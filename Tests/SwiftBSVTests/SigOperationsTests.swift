@@ -115,9 +115,11 @@ class SigOperationsTests: XCTestCase {
         let message = Data(Data(hex: "1972021cb452364bcf77c26ffabed86f4594c8605d83955ad14aa32093c54ff0"))
 
 
-        let test1 = try! Secp256k1.signCompact(msg: message.bytes, with: privateKey.data.bytes, nonceFunction: Secp256k1.NonceFunction.rfc6979)
+        // Foundation's Data.bytes now returns RawSpan in Swift 6+; secp256k1 wants [UInt8].
+        // [UInt8](data) materializes a byte array unambiguously across toolchain versions.
+        let test1 = try! Secp256k1.signCompact(msg: [UInt8](message), with: [UInt8](privateKey.data), nonceFunction: Secp256k1.NonceFunction.rfc6979)
 
-        let test = try! Secp256k1.sign(msg: message.bytes, with: privateKey.data.bytes, nonceFunction: Secp256k1.NonceFunction.rfc6979)
+        let test = try! Secp256k1.sign(msg: [UInt8](message), with: [UInt8](privateKey.data), nonceFunction: Secp256k1.NonceFunction.rfc6979)
 
         let sig = Crypto.sign(message, privateKey: privateKey)
 
@@ -191,11 +193,13 @@ class SigOperationsTests: XCTestCase {
     func testdsfdf() {
 
         let data = "Satoshi Nakamoto"
+        // CryptoSwift's String.sha256() returns a hex string, not raw bytes.
+        // [UInt8](hex:) parses the hex back to the 32 actual hash bytes.
         let hash = data.sha256()
 
         let key = Data(hex: "8F8A276C19F4149656B280621E358CCE24F5F52542772691EE69063B74F15D15")
 
-        let sig = try! Secp256k1.sign(msg: hash.bytes, with: key.bytes, nonceFunction: Secp256k1.NonceFunction.rfc6979)
+        _ = try! Secp256k1.sign(msg: [UInt8](hex: hash), with: [UInt8](key), nonceFunction: Secp256k1.NonceFunction.rfc6979)
 
     }
 
