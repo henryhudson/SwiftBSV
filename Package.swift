@@ -40,6 +40,11 @@ let package = Package(
         ),
         .testTarget(
             name: "SwiftBSVTests",
-            dependencies: ["SwiftBSV"]),
+            dependencies: ["SwiftBSV"],
+            // Bitcoin-Core / bitcoind / bitcoin-sv reference test vectors —
+            // declared so SPM stops warning about 10 unhandled JSON files
+            // and so consumers know these are intentional test resources,
+            // not stray data files.
+            resources: [.copy("Resources")]),
     ]
 )

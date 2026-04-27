@@ -190,7 +190,7 @@ public struct ChunkHelpers {
     public static func bitcoindStringFromChunks(_ chunks: [Chunk]) -> String {
         var string = ""
         for chunk in chunks {
-            if let buffer = chunk.buffer {
+            if chunk.buffer != nil {
                 let encoded = chunksToBuffer([chunk])
                 string = string + " " + "0x" + encoded.hex
             } else if let opCode = OpCodeFactory.get(with: chunk.opCodeNum) {

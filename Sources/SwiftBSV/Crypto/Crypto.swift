@@ -38,7 +38,9 @@ public final class Crypto {
    public static func hmacsha512(key: Data, data: Data) -> Data {
         let output: [UInt8]
         do {
-            output = try HMAC(key: [UInt8](key), variant: .sha512).authenticate([UInt8](data))
+            // CryptoSwift deprecated `.sha512` in favour of `.sha2(.sha512)`
+            // (with the addition of more SHA-2 variants in `.sha2(_:)`).
+            output = try HMAC(key: [UInt8](key), variant: .sha2(.sha512)).authenticate([UInt8](data))
         } catch let error {
             fatalError("Error occured. Description: \(error.localizedDescription)")
         }
@@ -69,7 +71,10 @@ public final class Crypto {
         let sig = Data(sig_)
 
         let a = try! ECDSA.signMessage(message, withPrivateKey: privateKey.data)
-        let b =  ECDSA.sign(message, privateKey: privateKey.data)
+        // ECDSA.sign smoke-checks the alternative path runs without crashing.
+        // Result is intentionally discarded — we only enforce equality between
+        // Secp256k1.sign (DER) and ECDSA.signMessage via the precondition below.
+        _ = ECDSA.sign(message, privateKey: privateKey.data)
 
         precondition(a == sig)
 

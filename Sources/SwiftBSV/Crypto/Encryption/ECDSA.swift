@@ -33,7 +33,7 @@ public final class ECDSA {
         defer { normalizedsig.deallocate() }
         secp256k1_ecdsa_signature_normalize(ctx, normalizedsig, signature)
 
-        var length = 64
+        let length = 64
         var compactSig = Data(count: length)
 
         compactSig.withUnsafeMutableBytes { (ptr) -> Void in

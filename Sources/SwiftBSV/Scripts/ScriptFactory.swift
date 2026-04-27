@@ -155,7 +155,7 @@ public extension ScriptFactory.PushDrop {
     /// Used to attach arbitrary data to a UTXO while preserving spendability.
     static func build(pushes: [Data], lockingScript: Script) -> Script? {
         guard !pushes.isEmpty else { return nil }
-        var script = Script()
+        let script = Script()
         do {
             for push in pushes {
                 try script.appendData(push)

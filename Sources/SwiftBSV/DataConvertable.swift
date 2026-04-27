@@ -15,11 +15,18 @@ protocol DataConvertable {
 
 extension DataConvertable {
     static func +(lhs: Data, rhs: Self) -> Data {
+        // Same dangling-pointer fix as Data+Script.swift's `BinaryConvertible.+`
+        // and `Data.init(from:)` — the previous form
+        // `UnsafeBufferPointer(start: &value, count: 1)` produced a buffer
+        // whose lifetime ended at the call boundary, leaving a dangling
+        // pointer that the compiler now warns on. `withUnsafeBytes(of:)`
+        // bounds the buffer's lifetime to the closure, and `Data($0)` copies
+        // before returning.
         var value = rhs
-        let data = Data(buffer: UnsafeBufferPointer(start: &value, count: 1))
+        let data = withUnsafeBytes(of: &value) { Data($0) }
         return lhs + data
     }
-    
+
     static func +=(lhs: inout Data, rhs: Self) {
         lhs = lhs + rhs
     }

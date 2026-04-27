@@ -126,7 +126,8 @@ class TransactionTests: XCTestCase {
             XCTAssertEqual(tx.serialized().hex, txBuf.hex)
 
             let sighashValue = nHashType.intValue
-            let sighash = UInt32(truncatingIfNeeded: sighashValue)
+            // `sighash` (the truncated UInt32 form) is not used in this assertion
+            // path — only `sighashType` flows into the signatureHash call below.
             let sighashType = SighashType(i: sighashValue)
 
             let hash = TransactionInputSigner.signatureHash(tx: tx, signatureVersion: .legacy, sighashType: sighashType, nIn: Int(truncating: nIn), subScript: script, value: 0)

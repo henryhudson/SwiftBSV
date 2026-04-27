@@ -117,13 +117,16 @@ class SigOperationsTests: XCTestCase {
 
         // Foundation's Data.bytes now returns RawSpan in Swift 6+; secp256k1 wants [UInt8].
         // [UInt8](data) materializes a byte array unambiguously across toolchain versions.
-        let test1 = try! Secp256k1.signCompact(msg: [UInt8](message), with: [UInt8](privateKey.data), nonceFunction: Secp256k1.NonceFunction.rfc6979)
+        // The two ad-hoc invocations below exist as smoke-checks that both
+        // signCompact and sign succeed for the test vector — discard with `_`
+        // since we aren't asserting on either return.
+        _ = try! Secp256k1.signCompact(msg: [UInt8](message), with: [UInt8](privateKey.data), nonceFunction: Secp256k1.NonceFunction.rfc6979)
 
-        let test = try! Secp256k1.sign(msg: [UInt8](message), with: [UInt8](privateKey.data), nonceFunction: Secp256k1.NonceFunction.rfc6979)
+        _ = try! Secp256k1.sign(msg: [UInt8](message), with: [UInt8](privateKey.data), nonceFunction: Secp256k1.NonceFunction.rfc6979)
 
         let sig = Crypto.sign(message, privateKey: privateKey)
 
-        for i in 0..<5 {
+        for _ in 0..<5 {
             let sig = Crypto.sign(message, privateKey: privateKey)
             print("sig    : " + sig.hex)
         }

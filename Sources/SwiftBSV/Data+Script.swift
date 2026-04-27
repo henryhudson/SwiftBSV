@@ -25,8 +25,13 @@ protocol BinaryConvertible {
 
 extension BinaryConvertible {
     static func +(lhs: Data, rhs: Self) -> Data {
+        // `UnsafeBufferPointer(start: &value, count: 1)` produced a dangling
+        // pointer — the inout argument's lifetime ended at the call boundary,
+        // so the buffer pointer outlived its storage. `withUnsafeBytes(of:)`
+        // gives a buffer whose lifetime is bounded by the closure, which
+        // `Data` then copies before returning.
         var value = rhs
-        let data = Data(buffer: UnsafeBufferPointer(start: &value, count: 1))
+        let data = withUnsafeBytes(of: &value) { Data($0) }
         return lhs + data
     }
     
@@ -75,8 +80,14 @@ extension Data: BinaryConvertible {
 
 extension Data {
     init<T>(from value: T) {
+        // Same dangling-pointer fix as `BinaryConvertible.+` above —
+        // `Swift.withUnsafeBytes(of:)` keeps the buffer alive for the
+        // duration of the closure, and `Data($0)` copies before returning.
+        // The `Swift.` qualifier is needed because we're inside `extension
+        // Data`, where the unqualified name resolves to Data's own instance
+        // method `withUnsafeBytes(_:)` rather than the global free function.
         var value = value
-        self.init(buffer: UnsafeBufferPointer(start: &value, count: 1))
+        self = Swift.withUnsafeBytes(of: &value) { Data($0) }
     }
     
     func to<T>(type: T.Type) -> T {

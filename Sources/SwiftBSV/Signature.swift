@@ -223,9 +223,13 @@ struct Signature {
         offset = 2 + 2
         count = rLength
         let rBuffer = buffer[offset..<(offset + count)]
-
-        let r = BInt(data: rBuffer)
-        let rneg = buffer[2 + 1 + 1] == 0x00
+        // The function ultimately returns the raw `rBuffer`/`sBuffer` Data
+        // slices; previous revisions also computed `BInt` values and
+        // negative-number flags (`r`, `rneg`, `s`, `sneg`) that were never
+        // returned or referenced — pure dead code that the compiler now
+        // flags. Removed; if a future change wants to surface the BInt
+        // representation or the leading-0x00 sign-padding flag, prefer
+        // returning them from this function rather than computing in vain.
 
         // Parse the S value
 
@@ -243,10 +247,6 @@ struct Signature {
         count = sLength
 
         let sBuffer = buffer[offset..<(offset+count)]
-
-        let s = BInt(data: sBuffer)
-        offset = 2 + 2 + rLength + 2 + 2
-        let sneg = buffer[offset] == 0x00
 
         // Validate length
 

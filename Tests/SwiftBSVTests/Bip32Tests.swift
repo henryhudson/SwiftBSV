@@ -25,8 +25,9 @@ class Bip32Tests: XCTestCase {
     func testFromXpubKey() {
         let xpub = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
 
-        let publicKey = Bip32(string: xpub)
-
+        // Smoke-check that xpub parsing returns a non-nil Bip32 — no further
+        // assertions yet, but the parse itself is the contract under test.
+        XCTAssertNotNil(Bip32(string: xpub))
     }
 
     func test() {

@@ -73,15 +73,20 @@ public final class Bip39 {
 
         var copy = derivedKeyData
         
-        let derivationStatus = copy.withUnsafeMutableBytes { derivedKeyBytes in
-            salt.withUnsafeBytes { saltBytes in
+        // Use the modern Raw-buffer-pointer API. The deprecated
+        // typed-buffer-pointer overloads (UnsafeMutableBytes returning a
+        // typed pointer, etc.) are the variants the compiler now warns on.
+        // CCKeyDerivationPBKDF expects raw byte pointers, which the new
+        // closures provide directly via `.baseAddress`.
+        let derivationStatus = copy.withUnsafeMutableBytes { (derivedKeyBytes: UnsafeMutableRawBufferPointer) in
+            salt.withUnsafeBytes { (saltBytes: UnsafeRawBufferPointer) in
                 CCKeyDerivationPBKDF(
                     CCPBKDFAlgorithm(kCCPBKDF2),
                     password, passwordData.count,
-                    saltBytes, salt.count,
+                    saltBytes.baseAddress?.assumingMemoryBound(to: UInt8.self), salt.count,
                     hash,
                     UInt32(rounds),
-                    derivedKeyBytes, derivedKeyData.count
+                    derivedKeyBytes.baseAddress?.assumingMemoryBound(to: UInt8.self), derivedKeyData.count
                 )
             }
         }

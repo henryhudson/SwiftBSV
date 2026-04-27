@@ -27,7 +27,9 @@ class Bip39Tests: XCTestCase {
         // More information here:
         // https://github.com/iancoleman/bip39/issues/58
 
-        let seed = Bip39.createSeed(mnemonic: "fruit wave dwarf banana earth journey tattoo true farm silk olive fence", withPassphrase: "banana")
+        // The full assertion path is commented-out below — parsing the
+        // mnemonic with passphrase still smoke-checks via discard.
+        _ = Bip39.createSeed(mnemonic: "fruit wave dwarf banana earth journey tattoo true farm silk olive fence", withPassphrase: "banana")
 
 //        let ss = PrivateKey(seed: seed)
 //

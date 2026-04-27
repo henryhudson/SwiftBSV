@@ -61,7 +61,9 @@ public class EllipticCurveEncrypterSecp256k1 {
     public func export(signature: inout secp256k1_ecdsa_recoverable_signature) -> Data {
         var output = Data(count: 65)
         var recId = 0 as Int32
-        _ = output.withUnsafeMutableBytes { output in
+        // The closure returns Void, so the leading `_ =` was redundant
+        // (the compiler now warns about discarding a Void result).
+        output.withUnsafeMutableBytes { output in
             guard let p = output.bindMemory(to: UInt8.self).baseAddress else { return }
             secp256k1_ecdsa_recoverable_signature_serialize_compact(context, p, &recId, &signature)
         }

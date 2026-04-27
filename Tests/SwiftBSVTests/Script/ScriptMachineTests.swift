@@ -43,8 +43,9 @@ class ScriptMachineTests: XCTestCase {
             )
 
             dump(result)
-        } catch let error {
-
+        } catch {
+            // Errors from execute(_:) are intentionally ignored in this smoke
+            // test — the only assertion is that the call returns at all.
         }
 
 
