@@ -27,7 +27,7 @@ public protocol BlockHeader {
 // MARK: - Block Header Validator
 
 /// Validates block headers according to Bitcoin consensus rules.
-public struct BlockHeaderValidator {
+public struct BlockHeaderValidator: Sendable {
 
     public init() {}
 
@@ -168,7 +168,7 @@ public struct BlockHeaderValidator {
 // MARK: - Chain Validation Result
 
 /// Result of chain validation
-public struct ChainValidationResult {
+public struct ChainValidationResult: Sendable {
     public let isValid: Bool
     public let validatedCount: Int
     public let errorMessage: String?
