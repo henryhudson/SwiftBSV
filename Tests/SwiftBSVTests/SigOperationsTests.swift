@@ -132,7 +132,10 @@ class SigOperationsTests: XCTestCase {
         print("sig    : " + sig.hex)
 
 
-        let check = Crypto.verifySignatureCompact(sig, message: message, publicKeyData: publicKey.toDer())
+        // Crypto.sign emits a DER-encoded signature, so verifySignature
+        // (DER) is the correct verifier — verifySignatureCompact expects
+        // the 65-byte recoverable-signature format from Crypto.signCompact.
+        let check = Crypto.verifySignature(sig, message: message, publicKey: publicKey)
 
         XCTAssertEqual(check, true)
 
@@ -158,7 +161,7 @@ class SigOperationsTests: XCTestCase {
         print(msgHash.hex)
         print(sig.hex)
 
-        let check = Crypto.verifySignatureCompact(sig, message: msgHash, publicKeyData: pubKey.toDer())
+        let check = Crypto.verifySignature(sig, message: msgHash, publicKey: pubKey)
 
         XCTAssert(check == true)
     }
@@ -183,7 +186,7 @@ class SigOperationsTests: XCTestCase {
 
 //        let pub = Crypto.computePublicKey(fromPrivateKey: privKey.data, compressed: false)
 
-        let check = Crypto.verifySignatureCompact(sig, message: msgHash, publicKeyData: privKey.publicKey.toDer())
+        let check = Crypto.verifySignature(sig, message: msgHash, publicKey: privKey.publicKey)
 
         XCTAssert(check == true)
     }

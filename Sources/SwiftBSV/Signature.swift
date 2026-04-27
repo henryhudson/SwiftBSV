@@ -167,7 +167,13 @@ struct Signature {
         let nHashTypeBuf: Data = {
             var buf = Data()
             if let nHashType = self.nHashType {
-                buf += nHashType.sighash
+                // Bitcoin tx-format sighash is a single byte appended after
+                // the DER signature (e.g. 0x01 for SIGHASH_ALL). The parser
+                // at init?(txFormatBuffer:) reads exactly one byte from the
+                // tail. Previously we appended the full UInt32 (4 bytes,
+                // little-endian: 0x01 0x00 0x00 0x00), which made round-trip
+                // tests fail and produced malformed transaction signatures.
+                buf += UInt8(nHashType.sighash & 0xff)
             } else {
                 buf += UInt8(0)
             }
