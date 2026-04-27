@@ -12,7 +12,7 @@ import CryptoSwift
 // MARK: - Merkle Proof Models
 
 /// Represents a Merkle proof for SPV verification
-public struct MerkleProof: Codable {
+public struct MerkleProof: Codable, Sendable {
     public let txid: String
     public let blockHash: String
     public let blockHeight: Int?
@@ -31,7 +31,7 @@ public struct MerkleProof: Codable {
 }
 
 /// TSC (Technical Standards Committee) Merkle proof format
-public struct TSCMerkleProof: Codable {
+public struct TSCMerkleProof: Codable, Sendable {
     public let index: Int
     public let txOrId: String
     public let target: String?
@@ -52,13 +52,13 @@ public struct TSCMerkleProof: Codable {
 }
 
 /// WhatsOnChain API Merkle proof response
-public struct WOCMerkleProof: Codable {
+public struct WOCMerkleProof: Codable, Sendable {
     public let blockHash: String
     public let branches: [WOCMerkleBranch]
     public let hash: String
     public let merkleRoot: String
 
-    public struct WOCMerkleBranch: Codable {
+    public struct WOCMerkleBranch: Codable, Sendable {
         public let hash: String
         public let pos: String  // "L" for left, "R" for right
 
@@ -79,7 +79,7 @@ public struct WOCMerkleProof: Codable {
 // MARK: - SPV Result Types
 
 /// Result of SPV verification
-public struct SPVVerificationResult {
+public struct SPVVerificationResult: Sendable {
     public let isValid: Bool
     public let txid: String
     public let blockHash: String
@@ -98,7 +98,7 @@ public struct SPVVerificationResult {
 }
 
 /// Tracks SPV verification status for a transaction
-public struct SPVTransactionStatus: Codable {
+public struct SPVTransactionStatus: Codable, Sendable {
     public let txid: String
     public var isVerified: Bool
     public var verificationDate: Date?
@@ -121,7 +121,7 @@ public struct SPVTransactionStatus: Codable {
 }
 
 /// SPV error types
-public enum SPVError: Error, LocalizedError {
+public enum SPVError: Error, LocalizedError, Sendable {
     case invalidMerkleProof
     case blockHeaderNotFound
     case merkleRootMismatch
