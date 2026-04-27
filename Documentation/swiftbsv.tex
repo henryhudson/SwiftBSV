@@ -1,0 +1,1319 @@
+\documentclass[a4paper, 11pt, openany]{book}
+
+% ─── Encoding & Language ─────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{microtype}
+
+% ─── Layout ──────────────────────────────────────────────────────
+\usepackage{geometry}
+\geometry{left=2.5cm, right=2.5cm, top=2.8cm, bottom=2.8cm}
+\raggedbottom
+
+% ─── Fonts ───────────────────────────────────────────────────────
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{inconsolata}
+\renewcommand{\familydefault}{\ttdefault}
+
+% Inconsolata's T1/zi4 FD file (TeXLive 2021) declares only /n and
+% /scit shapes --- no /it or /sl. Without these subs, any \emph or
+% \textit on monospace body text falls back to Computer Modern and
+% triggers "font shapes not available". We force-load the FD file
+% by selecting its upright shape once, then register italic/slanted
+% substitutions back to upright. Italic emphasis on a monospace
+% font is stylistically weak anyway, so upright-as-italic reads fine.
+\usefont{T1}{zi4}{m}{n}
+\DeclareFontShape{T1}{zi4}{m}{it}{<-> ssub * zi4/m/n}{}
+\DeclareFontShape{T1}{zi4}{m}{sl}{<-> ssub * zi4/m/n}{}
+\DeclareFontShape{T1}{zi4}{b}{it}{<-> ssub * zi4/b/n}{}
+\DeclareFontShape{T1}{zi4}{b}{sl}{<-> ssub * zi4/b/n}{}
+
+% ─── Colour — Retro-Future Palette ──────────────────────────────
+% Identical palette to Henceforth (hforth.tex) — these two books
+% are siblings in the same visual system.
+\usepackage[dvipsnames,svgnames,x11names]{xcolor}
+
+\definecolor{forthDark}{HTML}{111111}
+\definecolor{forthBg}{HTML}{0A0E0A}
+\definecolor{forthOrange}{HTML}{E8731E}
+\definecolor{forthAmber}{HTML}{F5A623}
+\definecolor{forthGold}{HTML}{CC8800}
+\definecolor{forthCyan}{HTML}{2CA5A0}
+\definecolor{forthTeal}{HTML}{1A8A7A}
+\definecolor{forthGreen}{HTML}{1B9E3E}
+\definecolor{forthBright}{HTML}{00FF41}
+\definecolor{forthGrey}{HTML}{888888}
+\definecolor{forthDim}{HTML}{CCCCCC}
+\definecolor{forthPurple}{HTML}{7744AA}
+\definecolor{forthPanelBg}{HTML}{F5F3EF}
+
+% ─── White background, dark text ────────────────────────────────
+\color{forthDark}
+
+% ─── Graphics & Tables ──────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\arrayrulecolor{forthGrey}
+\setlength{\heavyrulewidth}{0.8pt}
+\setlength{\lightrulewidth}{0.4pt}
+
+% ─── Lists ───────────────────────────────────────────────────────
+\usepackage{enumitem}
+\setlist[enumerate]{label=\textcolor{forthOrange}{\bfseries\arabic*.}, leftmargin=*, itemsep=4pt}
+\setlist[itemize]{label=\textcolor{forthOrange}{\raisebox{0.2ex}{\rule{0.6ex}{0.6ex}}}, leftmargin=*, itemsep=4pt}
+
+% ─── Boxes ───────────────────────────────────────────────────────
+\usepackage[most]{tcolorbox}
+
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small\color{forthDark},
+  breaklines=true,
+  columns=fixed,
+  keepspaces=true,
+  aboveskip=0pt,
+  belowskip=0pt,
+}
+
+% Forthbox: dark terminal panel — green on black, bold label.
+% Reused verbatim from Henceforth so Swift code samples sit in
+% the same visual frame as FORTH terminal sessions.
+\newtcblisting{forthbox}[1][]{%
+  enhanced,
+  breakable,
+  colback=forthBg,
+  colframe=forthDark,
+  coltext=forthBright,
+  coltitle=white,
+  fonttitle=\bfseries,
+  boxrule=1.2pt,
+  arc=0pt,
+  left=6mm, right=6mm, top=4mm, bottom=4mm,
+  attach boxed title to top left={yshift=-3mm, xshift=8mm},
+  boxed title style={
+    colback=forthOrange,
+    arc=0pt,
+    boxrule=0pt,
+    left=4mm, right=4mm, top=1.5mm, bottom=1.5mm
+  },
+  title={#1},
+  listing only,
+  listing options={basicstyle=\ttfamily\small\color{forthBright}, breaklines=true, columns=fixed, keepspaces=true},
+}
+
+% Notebox: warm panel with thick orange left bar
+\newtcolorbox{notebox}{%
+  enhanced,
+  breakable,
+  colback=forthPanelBg,
+  colframe=forthOrange,
+  coltext=forthDark,
+  boxrule=0pt,
+  borderline west={3pt}{0pt}{forthOrange},
+  arc=0pt,
+  left=5mm, right=5mm, top=3mm, bottom=3mm,
+  fontupper=\small,
+}
+
+% ─── Section styling — Retro-Future ────────────────────────────
+\usepackage{titlesec}
+
+% Chapter: big bold orange number, title on dark strip.
+% Footer label reads SWIFTBSV instead of HENCEFORTH so the
+% chapter-opener identifies which sibling book you're in.
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{forthDark}}
+  {\tikz[remember picture,overlay]{%
+    \fill[forthDark] (-2,-0.6) rectangle (\textwidth+2,2.4);
+    \node[anchor=west, text=forthOrange, font=\fontsize{80}{80}\selectfont\bfseries]
+      at (-0.5,0.6) {\thechapter};
+    \node[anchor=south east, text=forthGrey, font=\tiny, opacity=0.5]
+      at (\textwidth+1.5,-0.3) {SWIFTBSV};
+  }}
+  {0pt}
+  {\color{white}\Huge}
+  [\vspace{2pt}{\color{forthOrange}\rule{\textwidth}{3pt}}]
+
+% Section: orange bar + dark text
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{forthDark}}
+  {\colorbox{forthOrange}{\makebox[1.8em][c]{\color{white}\thesection}}}{0.6em}{}
+  [\vspace{-6pt}{\color{forthDim}\rule{\textwidth}{0.3pt}}]
+
+% Subsection: teal number, dark text
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{forthDark}}
+  {\textcolor{forthCyan}{\thesubsection}}{0.6em}{}
+
+\titlespacing*{\chapter}{0pt}{-20pt}{30pt}
+\titlespacing*{\section}{0pt}{18pt}{10pt}
+\titlespacing*{\subsection}{0pt}{14pt}{8pt}
+
+% ─── Headers & Footers ──────────────────────────────────────────
+\usepackage{fancyhdr}
+\setlength{\headheight}{22pt}
+\addtolength{\topmargin}{-10pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\small\textcolor{forthGrey}{\leftmark}}
+\fancyhead[RO]{\small\textcolor{forthGrey}{\rightmark}}
+\fancyfoot[C]{\small\textcolor{forthOrange}{\thepage}}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{forthDark}\leaders\hrule height \headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0pt}
+
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyfoot[C]{\small\textcolor{forthOrange}{\thepage}}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+% ─── Hyperlinks ──────────────────────────────────────────────────
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=forthCyan,
+  urlcolor=forthOrange,
+  citecolor=forthGreen,
+  pdfauthor={Henry Hudson},
+  pdftitle={SwiftBSV},
+}
+
+% ─── TikZ ────────────────────────────────────────────────────────
+\usepackage{tikz}
+\usetikzlibrary{calc,patterns}
+
+% ─── Misc ────────────────────────────────────────────────────────
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{pifont}
+\newcommand{\cmark}{\textcolor{forthGreen}{\ding{51}}}%
+\newcommand{\xmark}{\textcolor{forthGrey}{\ding{55}}}%
+\usepackage{fancyvrb}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}
+
+\let\cleardoublepage\clearpage
+
+% ═════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ─── Title Page — Retro-Future ──────────────────────────────────
+\begin{titlepage}
+\begin{tikzpicture}[remember picture, overlay]
+  % ── Black background ──
+  \fill[forthDark] (current page.south west) rectangle (current page.north east);
+  %
+  % ── Bold orange band — full width, upper third ──
+  \fill[forthOrange] ($(current page.north west)+(0,-6)$) rectangle ($(current page.north east)+(0,-10.5)$);
+  %
+  % ── Thin geometric accent lines ──
+  \draw[white, line width=0.4pt] ($(current page.north west)+(0,-10.7)$) -- ($(current page.north east)+(0,-10.7)$);
+  \draw[forthAmber, line width=2pt] ($(current page.north west)+(0,-11)$) -- ($(current page.north east)+(0,-11)$);
+  %
+  % ── Title — large, white, on the orange band ──
+  \node[anchor=west, text=white, font=\fontsize{56}{60}\selectfont\bfseries\ttfamily]
+    at ($(current page.north west)+(2.5,-7.8)$) {SwiftBSV};
+  %
+  % ── Subtitle — on the orange band, below title ──
+  \node[anchor=west, text=forthDark, font=\large\ttfamily]
+    at ($(current page.north west)+(2.5,-9.5)$) {A Bitcoin SV SDK for Swift};
+  %
+  % ── Companion tagline — below the band, teal ──
+  \node[anchor=west, text=forthCyan, font=\normalsize\ttfamily]
+    at ($(current page.north west)+(2.5,-12.2)$) {Companion library to Henceforth};
+  %
+  % ── Code excerpt — faded Swift on the dark area ──
+  \node[anchor=west, text=forthBright, font=\small\ttfamily, opacity=0.25]
+    at ($(current page.north west)+(2.5,-14)$) {let key = PrivateKey()};
+  \node[anchor=west, text=forthBright, font=\small\ttfamily, opacity=0.20]
+    at ($(current page.north west)+(2.5,-14.8)$) {let addr = key.address.toString()};
+  \node[anchor=west, text=forthBright, font=\small\ttfamily, opacity=0.15]
+    at ($(current page.north west)+(2.5,-15.6)$) {let bip32 = Bip32(seed: seed)};
+  \node[anchor=west, text=forthBright, font=\small\ttfamily, opacity=0.12]
+    at ($(current page.north west)+(2.5,-16.8)$) {let sig = ECDSA.sign(hash, key)};
+  \node[anchor=west, text=forthBright, font=\small\ttfamily, opacity=0.09]
+    at ($(current page.north west)+(2.5,-17.6)$) {try TxBuilder().build(useAllInputs: true)};
+  %
+  % ── Pitch — value-types tagline ──
+  \node[anchor=west, text=forthDim, font=\small\ttfamily, align=left, text width=16cm]
+    at ($(current page.north west)+(2.5,-19.8)$) {%
+      Bitcoin SV in pure Swift --- value types, Sendable\\
+      everything, structured concurrency. No Objective-C\\
+      bridges, no implicit globals, no surprises. The same\\
+      crypto stack that runs Henceforth.};
+  \node[anchor=west, text=forthOrange, font=\small\ttfamily\bfseries, align=left]
+    at ($(current page.north west)+(2.5,-22.4)$) {Keys are values.};
+  \node[anchor=west, text=forthOrange, font=\small\ttfamily\bfseries, align=left]
+    at ($(current page.north west)+(2.5,-22.9)$) {Signatures are values.};
+  \node[anchor=west, text=forthOrange, font=\small\ttfamily\bfseries, align=left]
+    at ($(current page.north west)+(2.5,-23.4)$) {Transactions are values.};
+  %
+  % ── Author ──
+  \node[anchor=south west, text=forthGrey, font=\large\ttfamily]
+    at ($(current page.south west)+(2.5,3)$) {Henry Hudson};
+  % ── Version ──
+  \node[anchor=south east, text=forthGrey, font=\small\ttfamily]
+    at ($(current page.south east)+(-2.5,3)$) {v1.0 \(\cdot\) 2026};
+  %
+  % ── Bottom orange accent strip ──
+  \fill[forthOrange] ($(current page.south west)+(0,1.5)$) rectangle ($(current page.south east)+(0,1.7)$);
+  %
+  % ── Decorative prompt ──
+  \node[anchor=south west, text=forthBright, font=\ttfamily, opacity=0.2]
+    at ($(current page.south west)+(2.5,0.4)$) {// ok.};
+\end{tikzpicture}
+\end{titlepage}
+
+% ─── Front Matter ────────────────────────────────────────────────
+\pagenumbering{roman}
+\tableofcontents
+\newpage
+\pagenumbering{arabic}
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{About}
+% ═════════════════════════════════════════════════════════════════
+
+SwiftBSV is a pure-Swift SDK for Bitcoin SV. It powers the wallet inside Henceforth and ships as a standalone Swift Package for any iOS or macOS app that needs Bitcoin keys, transactions, scripts, or SPV verification.
+
+\section{Links to Source Code}
+
+\href{https://github.com/henryhudson/SwiftBSV}{github.com/henryhudson/SwiftBSV}
+
+Add it to a Swift package via the dependency stanza shown in the \emph{Integration} chapter --- one line in \texttt{Package.swift} or one menu click in Xcode.
+
+\section{Status}
+
+\begin{itemize}
+\item \textbf{Swift tools 5.9+}, builds cleanly under \textbf{Swift 6} with strict concurrency.
+\item \textbf{Sendable} throughout the public surface --- pass values across actor boundaries without \texttt{@unchecked} or \texttt{@preconcurrency} workarounds.
+\item \textbf{No deprecated dependencies.} CryptoSwift 1.9.x and Boilertalk's secp256k1 binding are the only third-party packages.
+\item \textbf{CI green} on macOS 15 + Xcode 16 via GitHub Actions on every push to \texttt{main}.
+\end{itemize}
+
+\section{What This Book Covers}
+
+The chapters that follow walk every public type in the SDK from the bottom up:
+
+\begin{itemize}
+\item Cryptographic primitives (Point, BInt, Crypto)
+\item Keys and addresses (PrivateKey, PublicKey, Address, WIF)
+\item HD wallets (Bip39, Bip32) and Type42 (BRC-42) invoice-numbered derivation
+\item Signatures (ECDSA, sighash, BSM) and ECIES encryption (BIE1 wire format)
+\item Scripts and the full BSV opcode set
+\item Transactions and the fluent \texttt{TxBuilder}
+\item Simplified Payment Verification (block headers + Merkle proofs)
+\item SwiftPM integration and contributing
+\end{itemize}
+
+Every chapter includes runnable examples in dark terminal panels and notebox callouts for the safety invariants you cannot opt out of.
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Goals}
+% ═════════════════════════════════════════════════════════════════
+
+\section{What SwiftBSV Is}
+
+\begin{itemize}
+\item \textbf{Idiomatic Swift.} Value types where they make sense, classes only where mutation lifecycle demands it (\texttt{TxBuilder}, \texttt{Bip39}). No \texttt{NS} prefixes leaking through, no implicit globals, no completion-handler closures where \texttt{async}/\texttt{await} would do.
+\item \textbf{Compile-time safe.} Optionals where failure is part of the contract (parsing a malformed WIF, decoding a truncated DER signature). Throwing functions where the caller must handle it. No \texttt{try!}, no \texttt{fatalError} in the production path.
+\item \textbf{Wire-compatible with the rest of BSV.} ECIES emits \texttt{BIE1}-format ciphertext readable by \texttt{@bsv/sdk}. BSM signatures verify against any other Bitcoin Signed Message implementation. Transaction binary matches whatever a node will accept.
+\item \textbf{Small surface, deep semantics.} Every public type has a single clear responsibility. The \emph{whole} library fits in your head once you've read this book.
+\end{itemize}
+
+\section{What SwiftBSV Is Not}
+
+\begin{itemize}
+\item Not a wallet. Wallet UX, key storage, address discovery, sync strategy --- those live one layer up. SwiftBSV gives you the primitives; Henceforth shows one way to compose them.
+\item Not a network client. Broadcasting, fee quoting, UTXO fetching, Merkle-proof retrieval --- all out of scope. SwiftBSV \emph{validates} a Merkle proof; fetching one over HTTPS is your problem.
+\item Not a token/ordinal SDK. BSV-20, BSV-21, 1Sat Ordinals, BAP, MAP --- all build \emph{on top} of the primitives here. SwiftBSV stays at the protocol layer.
+\end{itemize}
+
+\section{Future}
+
+\begin{itemize}
+\item Direct support for BEEF (BRC-62) and BUMP (BRC-74) construction, not just verification.
+\item Streaming Merkle-tree construction for very large blocks.
+\item More extensive opcode tests --- the Hayes-style suite that covers Henceforth's FORTH side has no exact analogue here yet.
+\item A formal benchmark suite tracking ECDSA verification and SHA-256 throughput across iPhone generations.
+\end{itemize}
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Credits}
+% ═════════════════════════════════════════════════════════════════
+
+\section{Will Townsend --- Original SwiftBSV}
+
+SwiftBSV was originally written by Will Townsend at \href{https://github.com/wtsnz/SwiftBSV}{wtsnz/SwiftBSV} as a Swift port of the moneybutton/bsv JavaScript library, mashing together ideas from several earlier Swift Bitcoin projects (Yenom's BitcoinKit, Kevin Vitale's WalletKit, yuzushioh's HDWalletKit). The current fork at \href{https://github.com/henryhudson/SwiftBSV}{henryhudson/SwiftBSV} continues from that foundation: BSV-specific protocol decisions (restored opcodes, FORKID sighash, no segwit), Swift 6 strict concurrency, defensive Data slicing throughout the public surface, ECIES BIE1 wire compatibility, and a SPV verification module. Will's authorship of the BIP-32/39 implementation, the BInt big-integer wrapper, the Base58Check encoder, and the original \texttt{TxBuilder} fluent API is unchanged in this fork --- the structural debt is large and acknowledged.
+
+\section{Boilertalk's secp256k1.swift}
+
+\href{https://github.com/Boilertalk/secp256k1.swift}{Boilertalk's secp256k1.swift} wraps Pieter Wuille's reference C library (\texttt{libsecp256k1}) for Swift. SwiftBSV uses it for every elliptic-curve operation: ECDSA sign and verify, public-key tweak (Type42), compact signature recovery (BSM). When you see \texttt{Secp256k1.signCompact} or \texttt{publicKeyTweakMul} in the source, you're calling through Boilertalk's binding into the C library that underlies Bitcoin Core itself.
+
+\section{CryptoSwift}
+
+\href{https://github.com/krzyzanowskim/CryptoSwift}{Marcin Krzy\.{z}anowski's CryptoSwift} provides SHA-256, SHA-512, RIPEMD-160, AES-CBC, HMAC, and PBKDF2. Apple's \texttt{CryptoKit} covers most modern needs but lacks RIPEMD-160 (used in \texttt{Hash160} for address derivation) and AES-CBC (used in ECIES BIE1). CryptoSwift fills both gaps in a Swift-native way.
+
+\section{Bitcoin White Paper}
+
+The reference for everything in this book. Section 8 in particular --- \emph{Simplified Payment Verification} --- defines the trust model implemented in the SPV chapter.
+
+\href{https://craigwright.net/bitcoin-white-paper.pdf}{Bitcoin White Paper}
+
+\section{Henceforth}
+
+The companion book \href{https://github.com/henryhudson/FORTHapp}{Henceforth} documents the iOS app that consumes this SDK. SwiftBSV's design choices are calibrated for that consumer: every type that crosses an \texttt{@MainActor} boundary is \texttt{Sendable}; every initializer that touches the network is absent (because Henceforth's networking layer owns that); every value type is \texttt{Equatable} and \texttt{Hashable} where the protocol allows it because Henceforth's UI uses them in \texttt{ForEach} and \texttt{Set} routinely.
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Cryptographic Primitives}
+% ═════════════════════════════════════════════════════════════════
+
+\begin{notebox}
+\textbf{Layering.} The types in this chapter are the foundation everything else stands on. You rarely construct them directly --- \texttt{PrivateKey} hides \texttt{BInt}, \texttt{PublicKey} hides \texttt{Point}, \texttt{Hash160} is called for you by \texttt{Address}. They're documented here so when you see them in a stack trace or a generic constraint, you know what they mean.
+\end{notebox}
+
+\section{BInt --- Big Integer}
+
+Bitcoin keys are 256-bit integers. Swift's \texttt{Int} tops out at 64 bits, so SwiftBSV ships its own arbitrary-precision integer type, \texttt{BInt}, modeled on the conventional sign-magnitude representation. It conforms to \texttt{Comparable}, \texttt{Equatable}, \texttt{Hashable}, and the standard arithmetic operators.
+
+\begin{forthbox}[BInt -- Constructing 256-bit values]
+let n = BInt("01abcdef", radix: 16)!     // hex literal
+let m = BInt(decimalString: "10000000000000000000000")!
+let sum = n + m                           // operator overloading
+let neg = -m                              // unary minus
+
+if n < m { print("n is smaller") }
+\end{forthbox}
+
+You almost never write \texttt{BInt} directly in app code. The library uses it internally for the curve order \texttt{N}, the integer form of a private key, and the components of an ECDSA signature.
+
+\begin{notebox}
+\texttt{BInt} is \texttt{@unchecked Sendable}. The wrapped storage is internally a \texttt{Limbs} array of \texttt{UInt64}, mutated only inside arithmetic operators that produce new \texttt{BInt} values. There is no shared mutable state; the \texttt{@unchecked} is paying for the limitation that \texttt{Array<UInt64>} is not itself \texttt{Sendable} as of Swift 6, even though the way \texttt{BInt} uses it is.
+\end{notebox}
+
+\section{Point --- A Point on secp256k1}
+
+\texttt{Point} represents an \texttt{(x, y)} coordinate on the secp256k1 curve. It is the mathematical content of a public key.
+
+\begin{forthbox}[Point -- Internals you usually don't touch]
+let pubkey: PublicKey = privateKey.publicKey
+let point: Point = pubkey.point        // x: BInt, y: BInt
+
+// Compressed serialization (33 bytes)
+let compressed: Data = pubkey.toBuffer()
+
+// DER serialization (33 or 65 bytes)
+let der: Data = pubkey.toDer(compressed: true)
+\end{forthbox}
+
+You only handle \texttt{Point} directly in two places: when you write your own opcode-level script that pushes a curve point, or when you implement a multi-signature scheme by hand. For ordinary signing, encryption, and address derivation, \texttt{PublicKey} is the right type.
+
+\section{Crypto --- Hash and HMAC Helpers}
+
+The \texttt{Crypto} enum bundles the hash functions Bitcoin uses, plus an HMAC helper. Static functions only --- no state, no instance.
+
+\begin{forthbox}[Crypto -- Hash functions]
+let bytes: Data = "hello".data(using: .utf8)!
+
+let sha256: Data    = Crypto.sha256(bytes)              // 32 bytes
+let sha256d: Data   = Crypto.sha256sha256(bytes)        // 32 bytes (BTC standard)
+let hash160: Data   = Crypto.sha256ripemd160(bytes)     // 20 bytes (address hash)
+let sha512: Data    = Crypto.sha512(bytes)              // 64 bytes
+
+let key: Data = "secret".data(using: .utf8)!
+let mac: Data = Crypto.hmacsha256(key: key, data: bytes)
+let mac2: Data = Crypto.hmacsha512(key: key, data: bytes)
+\end{forthbox}
+
+\begin{notebox}
+\textbf{Why double SHA-256?} Bitcoin double-hashes nearly everything: transaction IDs, block header hashes, the message-digest step of ECDSA. The doubling defends against length-extension attacks on Merkle--Damg\aa{}rd hash functions and gives a second pass of avalanche even if a structural weakness in the inner hash is later discovered. \texttt{Crypto.sha256sha256} encapsulates this so you don't accidentally single-hash where the protocol calls for double-hashing.
+\end{notebox}
+
+\subsection{verifySigData}
+
+A combined hash-and-verify helper:
+
+\begin{forthbox}[Crypto.verifySigData]
+let data: Data = ...                  // arbitrary message bytes
+let sig: Data = ...                   // DER-encoded signature
+let pub: PublicKey = ...
+
+let ok: Bool = Crypto.verifySigData(
+    for: data,
+    signature: sig,
+    publicKey: pub
+)
+\end{forthbox}
+
+The function double-SHA-256s the input before verifying --- matching Bitcoin's \texttt{checksig} semantics --- so you pass the raw payload, not a pre-computed hash.
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Keys and Addresses}
+% ═════════════════════════════════════════════════════════════════
+
+\section{Network}
+
+Everything in SwiftBSV that has a wire-format byte representation carries a \texttt{Network} enum so the same code can produce mainnet and testnet artifacts:
+
+\begin{forthbox}[Network]
+public enum Network: Sendable {
+    case mainnet
+    case testnet
+}
+\end{forthbox}
+
+The default everywhere is \texttt{.mainnet}. Pass \texttt{.testnet} explicitly when you mean it.
+
+\section{PrivateKey}
+
+A \texttt{PrivateKey} wraps a 256-bit secret integer (\texttt{BInt}), a network tag, and a compression flag.
+
+\begin{forthbox}[PrivateKey -- Constructors]
+// Random key for the given network
+let key = PrivateKey(network: .mainnet)
+
+// From 32-byte raw seed
+let key2 = PrivateKey(data: bytes, network: .mainnet)
+
+// From WIF (Wallet Import Format) -- fails on bad checksum or
+// wrong network byte
+guard let key3 = PrivateKey(wif: "L1aW4...") else { return }
+
+// Properties
+let pub: PublicKey = key.publicKey   // derived on-demand
+let addr: Address = key.address      // P2PKH for the network
+let raw: Data = key.data             // 32 raw bytes
+\end{forthbox}
+
+\subsection{WIF Round-trip}
+
+Wallet Import Format is the standard textual encoding for private keys --- a Base58Check string with a network-discriminating version byte:
+
+\begin{forthbox}[PrivateKey -- WIF]
+let key = PrivateKey(network: .mainnet)
+let wif: String = key.toWif()          // "L1aW4...", 52 chars compressed
+let restored = PrivateKey(wif: wif)    // returns Optional
+\end{forthbox}
+
+\begin{notebox}
+\textbf{Compression flag survives WIF.} A WIF for a compressed key has a trailing \texttt{0x01} byte before the checksum is computed. Round-tripping through WIF preserves whether the public key should serialize as 33 bytes or 65 bytes. Don't lose track of the flag --- a "correct" key produces a \emph{different} address depending on its compression bit.
+\end{notebox}
+
+\section{PublicKey}
+
+A \texttt{PublicKey} is the curve point a private key derives to, plus its compression flag.
+
+\begin{forthbox}[PublicKey -- Construction \& serialization]
+// From hex (33 or 65 bytes)
+guard let pk = PublicKey(hex: "02a3b1c...") else { return }
+
+// From DER bytes (33 / 65)
+guard let pk2 = PublicKey(fromDer: derBytes, isStrict: true) else {
+    return
+}
+
+// Serialize back
+let derCompressed: Data   = pk.toDer(compressed: true)
+let derUncompressed: Data = pk.toDer(compressed: false)
+let raw: Data             = pk.toBuffer()  // 33 or 65 bytes
+
+// Address (P2PKH)
+let addr: Address = pk.address
+\end{forthbox}
+
+\subsection{Strict vs Lax DER Parsing}
+
+The \texttt{isStrict} flag on \texttt{init(fromDer:isStrict:)} controls whether the parser rejects malformed prefixes. Production callers should always pass \texttt{true}; the lax mode exists only for compatibility with historical malleable encodings and should not be used for newly received data.
+
+\begin{notebox}
+\textbf{Defensive Data slicing.} \texttt{init(fromDer:)} explicitly materializes its input via \texttt{let buffer = Data(buffer)} before subscripting. A \texttt{Data} slice in Swift preserves its parent's indices --- subscripting at \texttt{[0]} crashes if the slice was taken from a non-zero offset. SwiftBSV defends against this at every \texttt{init?} that takes a \texttt{Data} parameter, because callers in real apps pass slices all the time without realizing it.
+\end{notebox}
+
+\section{Address}
+
+\texttt{Address} is a P2PKH (Pay-to-Public-Key-Hash) destination. Construction is total --- pass any of the upstream key types and you get an address back:
+
+\begin{forthbox}[Address -- Construction]
+let priv = PrivateKey(network: .mainnet)
+let addr1 = Address(priv)                      // from PrivateKey
+let addr2 = Address(priv.publicKey)            // from PublicKey
+let addr3 = Address(bip32, network: .mainnet)  // from a Bip32 node
+
+// Parse a Base58Check string
+guard let addr4 = Address(fromString: "1A1zP1...", network: .mainnet)
+else { return }
+\end{forthbox}
+
+\subsection{Output Script}
+
+To pay an address, you need its locking script:
+
+\begin{forthbox}[Address -- Locking script]
+let script: Script = address.toTxOutputScript()
+// OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
+\end{forthbox}
+
+\texttt{Address} produces a standard P2PKH script. For non-standard outputs (P2SH, multisig, OP\_RETURN), build the \texttt{Script} directly --- see the \emph{Scripts} chapter.
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{HD Wallets — BIP-39 \& BIP-32}
+% ═════════════════════════════════════════════════════════════════
+
+\section{Bip39 --- Mnemonic Phrases}
+
+A 12-word or 24-word phrase from the BIP-39 word list. The phrase encodes 128 or 256 bits of entropy plus a checksum, and deterministically derives a 64-byte seed.
+
+\begin{forthbox}[Bip39 -- Generating a new mnemonic]
+// Standard 24-word phrase (256 bits of entropy)
+let phrase: String = Bip39.create(strength: .high)
+
+// 12-word phrase (128 bits of entropy)
+let short: String = Bip39.create(strength: .low)
+
+// From specific entropy (e.g. dice-rolled 32 bytes)
+let custom: String = Bip39.create(entropy: myEntropy)
+
+// Convert phrase to seed (with optional passphrase)
+let seed: Data = Bip39.createSeed(
+    mnemonic: phrase,
+    withPassphrase: ""
+)
+\end{forthbox}
+
+\begin{notebox}
+\textbf{The passphrase argument is real.} BIP-39 specifies an optional user passphrase that mixes into PBKDF2 alongside the mnemonic. Two wallets seeded from the same 24-word phrase but different passphrases derive entirely different key trees. The Henceforth wallet does not currently expose this field --- the empty string is used --- but the library exposes it for tooling that does.
+\end{notebox}
+
+\section{Bip32 --- Hierarchical Deterministic Keys}
+
+A \texttt{Bip32} node represents a single point in the HD key tree. From the seed produced by \texttt{Bip39}, you derive a master node, then descend by path:
+
+\begin{forthbox}[Bip32 -- Master and derivation]
+let seed = Bip39.createSeed(mnemonic: phrase)
+let master = Bip32(seed: seed, network: .mainnet)
+
+// Derive m/44'/236'/0'/0/0 (BIP-44 BSV receive address index 0)
+guard let node = master.derivedKey(path: "m/44'/236'/0'/0/0")
+else { return }
+
+let priv: PrivateKey? = node.privateKey
+let pub: PublicKey   = node.publicKey
+let addr: Address    = node.address
+\end{forthbox}
+
+\subsection{DerivationNode}
+
+Inside the path string, each step is encoded as a \texttt{DerivationNode}:
+
+\begin{forthbox}[Bip32 -- DerivationNode]
+public enum DerivationNode {
+    case hardened(UInt32)  // 0x80000000 | index
+    case notHardened(UInt32)
+}
+
+// Equivalent to "m/44'/236'/0'"
+let n1 = DerivationNode.hardened(44)
+let n2 = DerivationNode.hardened(236)
+let n3 = DerivationNode.hardened(0)
+\end{forthbox}
+
+Hardened derivation breaks the public-key-only chain --- you cannot derive hardened children from an extended public key alone. This is intentional: it isolates account-level keys from leaf-level exposure.
+
+\subsection{Public-Only Derivation}
+
+For watching-only wallets, you can hand someone an extended public key and let them derive child addresses without ever seeing the private side:
+
+\begin{forthbox}[Bip32 -- Public-only mode]
+let masterPub = master.toPublic()
+let xpub: String = masterPub.toString()
+
+// On the receiving device:
+guard let pubMaster = Bip32(string: xpub) else { return }
+guard let leaf = pubMaster.derivedKey(path: "m/0/0")
+else { return }
+// leaf.privateKey == nil, leaf.publicKey is valid
+\end{forthbox}
+
+\begin{notebox}
+\textbf{Path syntax.} \texttt{derivedKey(path:)} accepts the conventional \texttt{m/<index>['/]} format. Hardened children use \texttt{'} (apostrophe). Empty path \texttt{m} returns the receiver. Invalid path strings return \texttt{nil} --- always unwrap.
+\end{notebox}
+
+\subsection{Wire Format}
+
+The Base58Check serialization (\texttt{xprv...}, \texttt{xpub...}) round-trips through \texttt{toString()} / \texttt{init?(string:)} and matches the BIP-32 specification, byte for byte. SwiftBSV-produced \texttt{xprv} can be loaded by any standards-compliant BIP-32 implementation.
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Type42 — Invoice-Numbered Keys}
+% ═════════════════════════════════════════════════════════════════
+
+\begin{notebox}
+\textbf{Type42 is BRC-42.} The protocol is specified in \href{https://bsv.brc.dev/key-derivation/0042}{BRC-42}. SwiftBSV implements the full set: derive private keys (counterparty needs your private key + their public key), derive public keys (counterparty needs only public keys), self-derivation, and ECDH shared-secret extraction.
+\end{notebox}
+
+Type42 generates a fresh keypair per invoice number, mixing together one party's private key, the other party's public key, and a string. Two parties who share their public keys offline can independently derive the same address for any invoice number, without ever exchanging private material.
+
+\section{The Three Derivation Modes}
+
+\begin{forthbox}[Type42 -- derivePrivateKey]
+// You have your private key. Counterparty has their public key.
+// Both of you can compute the same shared invoice key.
+let derived: PrivateKey? = Type42.derivePrivateKey(
+    privateKey: myPrivateKey,
+    counterpartyPublicKey: theirPublicKey,
+    invoiceNumber: "invoice-2026-01-001"
+)
+\end{forthbox}
+
+\begin{forthbox}[Type42 -- derivePublicKey]
+// Both parties have only public keys. Useful for watch-only
+// wallets that prepare invoices without holding the spending key.
+let derivedPub: PublicKey? = Type42.derivePublicKey(
+    publicKey: myPublicKey,
+    counterpartyPublicKey: theirPublicKey,
+    invoiceNumber: "invoice-2026-01-001"
+)
+\end{forthbox}
+
+\begin{forthbox}[Type42 -- deriveSelf]
+// Self-derivation -- counterparty == self. Used for fresh
+// receive addresses inside a single wallet without coordinating
+// with anyone.
+let receive: PrivateKey? = Type42.deriveSelf(
+    privateKey: masterKey,
+    invoiceNumber: "wallet/0/recv/42"
+)
+\end{forthbox}
+
+\section{Henceforth Path Conventions}
+
+The wallet uses Type42 invoice numbers as a flat namespace:
+
+\begin{itemize}
+\item \texttt{wallet/0/recv/N} --- receive addresses (was \texttt{m/44'/236'/0'/0/N} in BIP-44)
+\item \texttt{wallet/0/change/N} --- change addresses
+\item \texttt{paymail/<handle>} --- per-paymail keys
+\item \texttt{bap/<id>} --- BAP identity attestation keys
+\end{itemize}
+
+The convenience wrappers \texttt{deriveChangeKey}, \texttt{derivePaymentKey}, \texttt{deriveEncryptionKey}, and \texttt{deriveBAPIdentity} build the appropriate invoice-number string and call through to \texttt{derivePrivateKey}.
+
+\section{ECDH Shared Secret}
+
+The mathematical operation underpinning Type42 --- and ECIES, BRC-103 auth, and any other protocol that needs a shared session key --- is ECDH:
+
+\begin{forthbox}[Type42 -- ecdhSharedSecret]
+let secret: [UInt8]? = Type42.ecdhSharedSecret(
+    privateKey: myPrivateKey,
+    publicKey: theirPublicKey
+)
+// 33 bytes -- compressed serialization of the shared point
+\end{forthbox}
+
+The result is the compressed serialization of the curve point obtained by multiplying the counterparty's public key by your private key. Symmetric: they get the same point by multiplying your public key by their private key.
+
+\begin{notebox}
+\textbf{Don't use the raw shared point as a key.} The compressed point has structure --- the leading byte is parity, leaving only 256 bits of variable material. For symmetric encryption you should run it through a KDF (BSV uses SHA-512 of the X coordinate to derive an IV, an AES key, and an HMAC key --- see the ECIES chapter). Treating the raw shared point as an AES key is a mistake.
+\end{notebox}
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Signatures}
+% ═════════════════════════════════════════════════════════════════
+
+\section{Signature --- ECDSA Values}
+
+A \texttt{Signature} bundles \texttt{(r, s)}, the sighash type, and a recovery hint. It encodes to two distinct wire formats depending on context:
+
+\begin{itemize}
+\item \textbf{DER} for general ECDSA --- variable-length, 70--72 bytes typically.
+\item \textbf{Tx format} for transaction signatures --- DER plus a single-byte sighash flag suffix.
+\end{itemize}
+
+\begin{forthbox}[Signature -- Construction \& encoding]
+let key = PrivateKey(network: .mainnet)
+let messageHash = Crypto.sha256sha256(message)
+
+// Sign produces a Signature value
+let sig = ECDSA.sign(
+    hash: messageHash,
+    privateKey: key
+)
+
+// DER bytes -- for verification by libsecp256k1, openssl, etc.
+let der: Data = sig.toDer()
+
+// Transaction format -- DER + sighash byte for OP_CHECKSIG
+let txFormat: Data = sig.toTxFormat()
+
+// Verify
+let ok = ECDSA.verify(
+    hash: messageHash,
+    signature: sig,
+    publicKey: key.publicKey
+)
+\end{forthbox}
+
+\begin{notebox}
+\textbf{Sighash byte width.} \texttt{toTxFormat} narrows the sighash to the low 8 bits via \texttt{UInt8(nHashType.sighash \& 0xff)}. Bitcoin's wire format takes a single byte; passing the full 32-bit sighash word would corrupt every transaction. SwiftBSV enforces this --- there's a regression test pinning the byte width.
+\end{notebox}
+
+\section{Sighash Types}
+
+\texttt{SighashType} is a bit-or of a base mode and the FORKID flag. BSV defaults to \texttt{ALL | FORKID}.
+
+\begin{forthbox}[SighashType -- BSV defaults]
+SighashType.BSV.ALL                    // sign every input + every output
+SighashType.BSV.NONE                   // sign every input, no outputs
+SighashType.BSV.SINGLE                 // sign every input, only matching output
+SighashType.BSV.ALL_ANYONECANPAY       // ALL | ANYONECANPAY
+\end{forthbox}
+
+The FORKID flag was added at the BCH/BSV chain split to prevent transaction replay between BTC and the new chains. Every BSV transaction signature includes it.
+
+\section{Bitcoin Signed Message (BSM)}
+
+BSM is the convention for signing arbitrary text with a Bitcoin private key, returning a Base64-encoded compact signature that any BSM-aware tool can verify against a Bitcoin address.
+
+\begin{forthbox}[BitcoinSignedMessage]
+let priv = PrivateKey(network: .mainnet)
+let addr = priv.address
+
+let msg = "I authorize transaction abc123..."
+
+// Returns Base64 string
+let sig: String = BitcoinSignedMessage.sign(
+    message: msg,
+    privateKey: priv
+)
+
+// Anyone with the address + message + signature can verify
+let ok: Bool = BitcoinSignedMessage.verify(
+    message: msg,
+    signature: sig,
+    address: addr
+)
+\end{forthbox}
+
+The verifier never sees the public key directly: it's recovered from the compact signature and matched against the supplied address.
+
+\begin{notebox}
+\textbf{Crash-safety on tampered signatures.} Earlier versions of SwiftBSV called \texttt{try!\ Secp256k1.recoverCompact(...)} during verification. A signature with an out-of-range recovery flag (e.g. flipped or truncated by a malicious caller) would crash the host process instead of returning \texttt{false}. The current implementation uses \texttt{guard let ... = try?\ ... else { return false }} --- failure to recover means failure to verify, never a crash.
+\end{notebox}
+
+\section{Recoverable Signatures and Compression}
+
+BSM signatures encode a 1-byte recovery header that selects which of up to four candidate public keys was the signer. Two bits encode parity and the second-derivative branch; one extra bit encodes whether the signer's public key was \emph{compressed} when the address was derived. Without the compression bit, \texttt{verify} cannot tell whether the recovered key should be hashed in compressed or uncompressed form, and the resulting address will not match.
+
+SwiftBSV preserves the compression flag across the round trip. If you sign with a compressed-form private key (the SwiftBSV default), the signature header reflects that, and verification against the corresponding compressed-form address succeeds.
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Encryption — ECIES (BIE1)}
+% ═════════════════════════════════════════════════════════════════
+
+\begin{notebox}
+\textbf{ECIES, Electrum/BSV flavour.} SwiftBSV implements the \emph{Electrum} variant of ECIES, identified by the wire prefix \texttt{"BIE1"}. This is the same format used by \texttt{@bsv/sdk}'s \texttt{EncryptedMessage} class --- ciphertext produced by SwiftBSV decrypts on Node.js, and vice versa. Wire-compatible interop is the whole point.
+\end{notebox}
+
+\section{The BIE1 Wire Format}
+
+\begin{verbatim}
+"BIE1"  ||  ephemeralPubKey  ||  ciphertext  ||  HMAC
+   4              33                  N           32
+\end{verbatim}
+
+The ephemeral public key is 33 bytes (compressed). The HMAC is 32 bytes (HMAC-SHA-256). The ciphertext is AES-256-CBC over the plaintext, padded with PKCS\#7. Total overhead is 69 bytes regardless of message length.
+
+\section{Key Derivation}
+
+The shared secret is the X coordinate of \texttt{ephemeralPrivKey * recipientPubKey}. From it:
+
+\begin{verbatim}
+key = SHA-512(sharedX)
+iv  = key[0:16]    // AES-CBC IV
+kE  = key[16:32]   // AES-CBC key (256-bit, 16-byte truncation? no -- 16 bytes!)
+kM  = key[32:64]   // HMAC-SHA-256 key
+\end{verbatim}
+
+\begin{notebox}
+\textbf{16-byte AES key with a 32-byte HMAC key.} The Electrum format derives a 128-bit AES key (\texttt{kE} is 16 bytes) and a 256-bit HMAC key. This matches Electrum's historical choice, not the strongest possible parameter set --- but it is the format every BSV implementation has shipped. Don't change the slicing; you'll break interop.
+\end{notebox}
+
+\section{API}
+
+\begin{forthbox}[ECIESEncryption -- encrypt \& decrypt]
+import SwiftBSV
+
+let recipient = PrivateKey(network: .mainnet)
+let recipientPub = recipient.publicKey
+
+// Sender does not need their own keypair -- ECIES generates an
+// ephemeral one per message. Pass nil for senderPrivateKey.
+let plaintext: Data = "secret".data(using: .utf8)!
+let cipher: Data = try ECIESEncryption.encrypt(
+    plaintext: plaintext,
+    recipientPublicKey: recipientPub,
+    senderPrivateKey: nil
+)
+
+// Recipient -- only needs their own private key
+let recovered: Data = try ECIESEncryption.decrypt(
+    ciphertext: cipher,
+    privateKey: recipient
+)
+// recovered == plaintext
+\end{forthbox}
+
+\subsection{Authenticated Sender Mode}
+
+Pass a sender private key when you want the recipient to know who sent the message. The protocol still uses an ephemeral key for confidentiality, but the HMAC is keyed in a way the recipient can validate against the named sender.
+
+\begin{forthbox}[ECIES -- Authenticated]
+let sender = PrivateKey(network: .mainnet)
+let cipher = try ECIESEncryption.encrypt(
+    plaintext: data,
+    recipientPublicKey: recipientPub,
+    senderPrivateKey: sender
+)
+
+// Recipient supplies their own private key + the expected
+// sender public key. HMAC failure means either the message
+// was tampered or the sender wasn't who you expected.
+let recovered = try ECIESEncryption.decrypt(
+    ciphertext: cipher,
+    privateKey: recipient,
+    senderPublicKey: sender.publicKey
+)
+\end{forthbox}
+
+\section{Errors}
+
+\texttt{ECIESError} is a small enum:
+
+\begin{itemize}
+\item \texttt{.invalidPublicKey} --- the embedded sender public key didn't deserialize as a valid curve point
+\item \texttt{.hmacMismatch} --- ciphertext failed authentication
+\item \texttt{.invalidCiphertextFormat} --- wrong magic prefix, truncated input, or non-canonical encoding
+\item \texttt{.encryptionFailed} / \texttt{.decryptionFailed} --- AES-CBC failure (typically padding)
+\end{itemize}
+
+\begin{notebox}
+\textbf{Constant-time HMAC comparison.} The library uses \texttt{Data}'s \texttt{==} for HMAC verification, which short-circuits on the first mismatched byte. For a network protocol that's reachable by an unbounded attacker, you would prefer a constant-time comparison. SwiftBSV's threat model is local: the ciphertext has already been received, the attacker cannot mount a real-time timing oracle, and the cost-benefit of constant-time comparison doesn't move. If you embed SwiftBSV in a server-side application, audit this assumption against your own threat model.
+\end{notebox}
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Scripts and Opcodes}
+% ═════════════════════════════════════════════════════════════════
+
+\section{Script Anatomy}
+
+A Bitcoin \texttt{Script} is a sequence of \texttt{Chunk}s --- each chunk is either a single opcode or a \texttt{PUSHDATA} containing literal bytes. SwiftBSV models the structure faithfully:
+
+\begin{forthbox}[Script -- Standard P2PKH]
+let priv = PrivateKey(network: .mainnet)
+let addr = priv.address
+
+// Build by hand
+var script = Script()
+_ = script
+    .append(.OP_DUP)
+    .append(.OP_HASH160)
+    .appendData(Crypto.sha256ripemd160(priv.publicKey.toBuffer()))
+    .append(.OP_EQUALVERIFY)
+    .append(.OP_CHECKSIG)
+
+// Or use the convenience
+let sameScript = addr.toTxOutputScript()
+\end{forthbox}
+
+\section{Opcode Catalogue}
+
+Opcodes live in \texttt{Sources/SwiftBSV/Scripts/OP\_CODE/} grouped by category:
+
+\begin{itemize}
+\item \textbf{Push Data} --- \texttt{OP\_FALSE/0}, \texttt{OP\_PUSHDATA1/2/4}, \texttt{OP\_1NEGATE}, \texttt{OP\_1}\ldots\texttt{OP\_16}
+\item \textbf{Flow Control} --- \texttt{OP\_NOP}, \texttt{OP\_IF}, \texttt{OP\_NOTIF}, \texttt{OP\_ELSE}, \texttt{OP\_ENDIF}, \texttt{OP\_VERIFY}, \texttt{OP\_RETURN}
+\item \textbf{Stack} --- \texttt{OP\_DUP}, \texttt{OP\_DROP}, \texttt{OP\_SWAP}, \texttt{OP\_OVER}, \texttt{OP\_ROT}, \texttt{OP\_PICK}, \texttt{OP\_ROLL}, \texttt{OP\_DEPTH}\ldots
+\item \textbf{Splice} --- \texttt{OP\_CAT}, \texttt{OP\_SPLIT}, \texttt{OP\_NUM2BIN}, \texttt{OP\_BIN2NUM}, \texttt{OP\_SIZE}
+\item \textbf{Bitwise Logic} --- \texttt{OP\_INVERT}, \texttt{OP\_AND}, \texttt{OP\_OR}, \texttt{OP\_XOR}, \texttt{OP\_EQUAL}, \texttt{OP\_EQUALVERIFY}
+\item \textbf{Arithmetic} --- \texttt{OP\_ADD}, \texttt{OP\_SUB}, \texttt{OP\_MUL}, \texttt{OP\_DIV}, \texttt{OP\_MOD}, \texttt{OP\_BOOLAND}, \texttt{OP\_BOOLOR}\ldots
+\item \textbf{Crypto} --- \texttt{OP\_HASH160}, \texttt{OP\_HASH256}, \texttt{OP\_SHA1}, \texttt{OP\_SHA256}, \texttt{OP\_RIPEMD160}, \texttt{OP\_CHECKSIG}, \texttt{OP\_CHECKMULTISIG}
+\item \textbf{Lock Time} --- \texttt{OP\_CHECKLOCKTIMEVERIFY}, \texttt{OP\_CHECKSEQUENCEVERIFY}
+\item \textbf{Reserved Words} --- the Chronicle-restored opcodes that BSV brought back from the original protocol set
+\end{itemize}
+
+The full enumeration is exhaustive --- BSV restored every opcode that BTC removed at the chain split. The library exposes them all as enum cases on \texttt{OpCode}.
+
+\begin{notebox}
+\textbf{Script vs FORTH.} Henceforth's FORTH terminal is the human-facing interface to script construction --- you type \texttt{OP\_DUP OP\_HASH160 ... OP\_CHECKSIG} and the recorder emits the bytes. SwiftBSV's \texttt{Script} type is the programmatic interface, used by \texttt{TxBuilder} and by anyone embedding script construction inside a Swift host. The two represent the same underlying objects; pick the one that matches your context.
+\end{notebox}
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Transactions}
+% ═════════════════════════════════════════════════════════════════
+
+\section{Transaction Structure}
+
+A BSV transaction is the same algebraic object the white paper describes:
+
+\begin{verbatim}
+Transaction
+  +-- version            (4 bytes)
+  +-- inputs             (varint count + N inputs)
+  |     \-- (prevTxid, prevVout, scriptSig, sequence)
+  +-- outputs            (varint count + M outputs)
+  |     \-- (value, scriptPubKey)
+  \-- lockTime           (4 bytes)
+\end{verbatim}
+
+SwiftBSV exposes \texttt{Transaction}, \texttt{TransactionInput}, and \texttt{TransactionOutput} as value types. You can construct one by hand, but the \texttt{TxBuilder} fluent API is the conventional path.
+
+\section{TxBuilder --- Fluent Construction}
+
+\texttt{TxBuilder} is a class (not a struct) because building a transaction is a sequence of mutations against an evolving state, and a class lets you chain calls that all return \texttt{self}.
+
+\begin{forthbox}[TxBuilder -- A complete pay-to-address transaction]
+let alice = PrivateKey(network: .mainnet)
+let bob   = Address(fromString: "1A1zP1...", network: .mainnet)!
+
+let utxo: TransactionOutput = ...   // from your UTXO source
+let prevTxid: Data           = ...
+let prevVout: UInt32         = 0
+
+let builder = TxBuilder()
+
+_ = builder
+    .setVersion(2)
+    .setFeePerKb(50)
+    .setChangeAddress(alice.address)
+    .inputFromPubKeyHash(
+        txHashBuffer: prevTxid,
+        txOutNum: prevVout,
+        txOut: utxo,
+        pubKey: alice.publicKey
+    )
+    .outputToAddress(value: 50_000, address: bob)
+
+let built = try builder.build(useAllInputs: true)
+
+// Sign every input
+for i in 0..<built.transaction.inputs.count {
+    _ = built.signInTx(
+        nIn: i,
+        privateKey: alice
+    )
+}
+
+let raw: Data = built.transaction.serialized()
+let txid: String = built.transaction.txID
+\end{forthbox}
+
+\subsection{Method Reference}
+
+\begin{forthbox}[TxBuilder -- Setters \& inputs]
+.setVersion(_ version: UInt32)
+.setNLockTime(_ nLockTime: UInt32)
+.setFeePerKb(_ fee: Float)
+.setChangeAddress(_ changeAddress: Address)
+.setChangeScript(_ changeScript: Script)
+
+.inputFromScript(
+    _ txHashBuffer: Data,
+    txOutNum: UInt32,
+    txOut: TransactionOutput,
+    script: Script,
+    nSequence: UInt32
+)
+
+.inputFromPubKeyHash(
+    txHashBuffer: Data,
+    txOutNum: UInt32,
+    txOut: TransactionOutput,
+    pubKey: PublicKey,
+    nSequence: UInt32 = 0xffffffff,
+    nHashType: SighashType = SighashType.BSV.ALL
+)
+
+.outputToAddress(value: UInt64, address: Address)
+.outputToScript(value: UInt64, script: Script)
+\end{forthbox}
+
+\subsection{build(useAllInputs:)}
+
+\texttt{build(useAllInputs:)} computes a final fee against \texttt{feePerKb}, picks UTXOs to cover the outputs, and emits a change output if there's leftover value. Pass \texttt{true} to force every added input into the final transaction (useful when you have already pre-selected coins and want no further filtering); pass \texttt{false} to let the builder pick the minimum subset.
+
+\subsection{signInTx(nIn:privateKey:)}
+
+Signs a single input with the supplied private key. Repeat for every input. The signature uses \texttt{SighashType.BSV.ALL | FORKID} by default; pass an explicit \texttt{sighashType:} to override.
+
+\begin{notebox}
+\textbf{Build, then sign --- always in that order.} \texttt{build} computes input/output structure and locks down the transaction shape. Signing earlier produces signatures over a transaction that no longer exists by the time \texttt{build} mutates the input set. The wallet code in Henceforth follows the build-then-sign discipline; replicate it in your own consumers.
+\end{notebox}
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{SPV — Block Headers and Merkle Proofs}
+% ═════════════════════════════════════════════════════════════════
+
+\begin{notebox}
+\textbf{What SwiftBSV does in SPV.} The library implements the \emph{verification} side: given a block header, validate its proof-of-work; given a chain of headers, validate that each links to its parent; given a Merkle proof, validate that a transaction belongs to a header's Merkle root. The library does \emph{not} fetch headers or proofs --- that's the consumer's job. Henceforth's \texttt{HeaderSyncService} and \texttt{SPVService} are reference consumers; see Henceforth's SPV chapter for the architectural pattern.
+\end{notebox}
+
+\section{BlockHeader Protocol}
+
+Anything that can answer the eight standard fields conforms to the \texttt{BlockHeader} protocol. You don't have to use SwiftBSV's own model type --- WhatsOnChain's \texttt{WOCGetHeadersModel} (in Henceforth) conforms directly:
+
+\begin{forthbox}[BlockHeader protocol]
+public protocol BlockHeader {
+    var hash: String { get }
+    var height: Int { get }
+    var version: Int { get }
+    var merkleroot: String { get }
+    var time: Date { get }
+    var nonce: Int { get }
+    var bits: String { get }
+    var previousblockhash: String { get }
+}
+\end{forthbox}
+
+\section{BlockHeaderValidator}
+
+The validator runs three checks:
+
+\begin{forthbox}[BlockHeaderValidator]
+let validator = BlockHeaderValidator()
+
+// 1. Single-header proof-of-work
+let powOK: Bool = validator.validateProofOfWork(header: header)
+
+// 2. Chain-link to parent
+let linkOK: Bool = validator.validateChainLink(
+    header: child,
+    previousHeader: parent
+)
+
+// 3. Full chain -- sorts by height, validates PoW + linking
+let result: ChainValidationResult =
+    validator.validateHeaderChain(headers: headers)
+
+if result.isValid {
+    print("validated \(result.validatedCount) headers")
+} else {
+    print(result.errorMessage ?? "unknown error")
+}
+\end{forthbox}
+
+\subsection{Block Hashing}
+
+Computing a block's hash is the same procedure the white paper specifies:
+
+\begin{forthbox}[BlockHeaderValidator.calculateBlockHash]
+// Serialize the 80-byte header (version + prev hash + merkle root
+// + timestamp + bits + nonce, with the hash and merkle root
+// reversed to wire byte order)
+let serialized: Data? = validator.serializeBlockHeader(header: h)
+
+// Double-SHA-256 and reverse to display byte order
+let hash: String? = validator.calculateBlockHash(header: h)
+\end{forthbox}
+
+\subsection{Target from Bits}
+
+The \texttt{bits} field encodes the difficulty target in compact form. The validator unpacks it for PoW comparison:
+
+\begin{forthbox}[Target arithmetic]
+let target: UInt256? = validator.targetFromBits(bits: header.bits)
+
+// PoW passes if computed hash, interpreted as UInt256,
+// is strictly less than target
+let hashValue: UInt256? = UInt256(hexString: computedHash)
+let powOK = hashValue! < target!
+\end{forthbox}
+
+\texttt{UInt256} is a custom big-endian 256-bit comparable struct. It exists specifically for hash/target comparisons and has no arithmetic beyond left-shift and ordering --- enough to evaluate \texttt{coefficient << ((exponent - 3) * 8)}.
+
+\section{Merkle Proof Formats}
+
+SwiftBSV understands three Merkle proof formats:
+
+\begin{itemize}
+\item \textbf{Standard \texttt{MerkleProof}} --- generic representation: \texttt{(txid, blockHash, index, nodes)}.
+\item \textbf{TSC (BRC-74) \texttt{TSCMerkleProof}} --- the Technical Standards Committee compact format used by BSV miners and indexers.
+\item \textbf{WhatsOnChain \texttt{WOCMerkleProof}} --- the WoC API response shape with directional branches (\texttt{"L"} / \texttt{"R"}).
+\end{itemize}
+
+\begin{forthbox}[MerkleVerifier -- Standard proof]
+let proof = MerkleProof(
+    txid: "...",
+    blockHash: "...",
+    blockHeight: 800_000,
+    merkleRoot: "...",
+    index: 42,
+    nodes: ["aaaa...", "bbbb...", ...]
+)
+
+let verifier = MerkleVerifier()
+let ok = verifier.verifyMerkleProof(
+    proof,
+    expectedMerkleRoot: header.merkleroot
+)
+\end{forthbox}
+
+\begin{forthbox}[MerkleVerifier -- TSC (BRC-74)]
+let tsc = TSCMerkleProof(
+    index: 42,
+    txOrId: "...",
+    target: header.merkleroot,
+    nodes: ["...", "..."],
+    targetType: "merkleroot",
+    proofType: "branch",
+    composite: false
+)
+
+let ok = verifier.verifyTSCProof(
+    tsc,
+    expectedMerkleRoot: header.merkleroot
+)
+\end{forthbox}
+
+\begin{forthbox}[MerkleVerifier -- WhatsOnChain]
+// Verify the WoC proof against a header's merkle root that you
+// fetched independently. NEVER trust the proof's embedded root --
+// always cross-check with a header from the chain-validated store.
+let ok = verifier.verifyWOCProofAgainstRoot(
+    wocProof,
+    expectedMerkleRoot: localHeader.merkleroot
+)
+\end{forthbox}
+
+\subsection{Pair Hashing in Display vs Wire Order}
+
+The trickiest part of Merkle verification is the byte-order convention. Bitcoin hashes appear in the API and the UI in \emph{display} order (most significant byte first), but the underlying double-SHA-256 operates on \emph{wire} order (least significant byte first). \texttt{doubleSHA256HashPair} encapsulates this:
+
+\begin{forthbox}[doubleSHA256HashPair]
+public func doubleSHA256HashPair(left: String, right: String) -> String {
+    let leftBytes = Data(hex: left)
+    let rightBytes = Data(hex: right)
+
+    var combined = Data(leftBytes.reversed())
+    combined.append(Data(rightBytes.reversed()))
+
+    let hash1 = Data(combined).sha256()
+    let hash2 = Data(hash1).sha256()
+
+    return Data(Data(hash2).reversed()).hex
+}
+\end{forthbox}
+
+The two reversals --- on input and on output --- mean the function takes display-hex in and produces display-hex out, while internally hashing in wire order. Get this wrong (forget either reversal, or do both reversals on only one side) and the entire Merkle path will appear to mismatch the root for opaque reasons.
+
+\begin{notebox}
+\textbf{Defense in depth.} Even when verifying a Merkle proof against a header's \texttt{merkleroot}, you should validate the header's PoW \emph{before} accepting the proof. A header with a wrong \texttt{merkleroot} could be served to you by a hostile API; an attacker who controls one endpoint cannot also produce a valid PoW pre-image. Always sequence: (1) PoW-validate the header, (2) verify the Merkle proof against the validated header's root, (3) only then declare the transaction confirmed.
+\end{notebox}
+
+\section{SPV Errors}
+
+\texttt{SPVError} is the closed enum returned by verification failures:
+
+\begin{itemize}
+\item \texttt{.invalidMerkleProof} --- the proof structure is malformed (e.g. wrong number of branches for the index)
+\item \texttt{.blockHeaderNotFound} --- the consumer was asked to verify against a header it doesn't have
+\item \texttt{.merkleRootMismatch} --- the proof verified to a different root than the header
+\item \texttt{.invalidProofFormat} --- format-level rejection
+\item \texttt{.networkError(String)} --- carried up from the consumer's network layer
+\item \texttt{.txNotInBlock} --- proof unavailable for the transaction (typical when a tx is mempool-only)
+\item \texttt{.invalidBlockHash} --- the block hash failed PoW or didn't link
+\item \texttt{.headerChainNotSynced(requiredHeight: Int, localTip: Int)} --- the tx is in a block above the locally validated tip; the consumer should retry once sync catches up, not present this as a verification failure
+\end{itemize}
+
+The distinction between \texttt{.blockHeaderNotFound} and \texttt{.headerChainNotSynced} is what lets the consumer (Henceforth) show \emph{"$\bigtriangleup$ SPV PENDING"} for sync gaps and \emph{"$\times$ SPV FAILED"} for genuine verification failures.
+
+% ═════════════════════════════════════════════════════════════════
+\chapter{Integration}
+% ═════════════════════════════════════════════════════════════════
+
+\section{SwiftPM}
+
+In your \texttt{Package.swift}:
+
+\begin{forthbox}[Package.swift -- Adding SwiftBSV]
+// swift-tools-version:5.9
+import PackageDescription
+
+let package = Package(
+    name: "MyApp",
+    platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16)],
+    dependencies: [
+        .package(
+            url: "https://github.com/henryhudson/SwiftBSV",
+            branch: "main"
+        )
+    ],
+    targets: [
+        .target(
+            name: "MyApp",
+            dependencies: ["SwiftBSV"]
+        )
+    ]
+)
+\end{forthbox}
+
+\section{Xcode}
+
+File $\rightarrow$ Add Packages\ldots $\rightarrow$ paste the GitHub URL $\rightarrow$ \emph{Branch: main}. Add \texttt{SwiftBSV} to your application target's framework list. Done.
+
+\section{Platform Requirements}
+
+\begin{itemize}
+\item \textbf{Swift tools 5.9+} (the \texttt{Package.swift} declares this minimum)
+\item \textbf{iOS 16 / macOS 13 / tvOS 16} or later
+\item \textbf{Xcode 16+} for full Swift 6 strict-concurrency builds
+\end{itemize}
+
+\section{Importing}
+
+\begin{forthbox}[import SwiftBSV]
+import SwiftBSV
+
+// Everything documented in this book is in the SwiftBSV module.
+// No subspec or qualified import -- single import covers all
+// public surface.
+\end{forthbox}
+
+\subsection{Swift 6 Concurrency Notes}
+
+Every public type that crosses an actor boundary in real code is \texttt{Sendable}. You can pass \texttt{PrivateKey}, \texttt{PublicKey}, \texttt{Address}, \texttt{Bip32}, \texttt{Signature}, \texttt{MerkleProof}, and \texttt{ChainValidationResult} freely between \texttt{@MainActor} and detached \texttt{Task} contexts.
+
+A small number of types remain non-\texttt{Sendable} because mutation is part of their interface:
+
+\begin{itemize}
+\item \texttt{TxBuilder} --- holds an evolving \texttt{Transaction}; mutate it on one isolation domain and pass the resulting \texttt{Transaction} (which \emph{is} \texttt{Sendable}) across boundaries.
+\item \texttt{Bip39} --- a static-only entry point in practice; the class itself is not constructible.
+\end{itemize}
+
+\begin{notebox}
+\textbf{No \texttt{@preconcurrency import SwiftBSV} required.} Earlier Henceforth code carried \texttt{@preconcurrency import} on five files because not every type was \texttt{Sendable}. The current build is clean --- those workarounds were removed once the underlying types were marked. If you find yourself needing \texttt{@preconcurrency} against SwiftBSV, file an issue: it's a bug in the library, not your consumer.
+\end{notebox}
+
+\section{License}
+
+SwiftBSV is published under the same license as the upstream Yenom BitcoinKit it forked from --- see \texttt{LICENSE} in the repository root. The fork preserves Yenom's copyright notices on files that retain their original authorship and adds Henry Hudson's copyright on materially rewritten files.
+
+\section{Contributing}
+
+The repository accepts pull requests for:
+
+\begin{itemize}
+\item Bug fixes against documented behavior
+\item New tests --- particularly in the SPV, ECIES, and Type42 areas where coverage is shallower than ECDSA
+\item Documentation corrections --- this book is generated from \texttt{swiftbsv.tex} in the LaTeX repo; corrections welcome there too
+\item Performance improvements with benchmarks
+\end{itemize}
+
+API additions are accepted on a case-by-case basis --- the goal is a \emph{small} library, not a kitchen sink. Open an issue describing the use case before opening a PR for a new public type.
+
+\end{document}

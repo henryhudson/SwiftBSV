@@ -89,3 +89,16 @@ fastlane/test_output
 
 iOSInjectionProject/
 SwiftBSV.framework.zip
+
+# LaTeX build artifacts (Documentation/)
+Documentation/*.aux
+Documentation/*.log
+Documentation/*.out
+Documentation/*.toc
+Documentation/*.idx
+Documentation/*.listing
+Documentation/*.synctex.gz
+Documentation/*.fls
+Documentation/*.fdb_latexmk
+Documentation/*.ilg
+Documentation/*.ind
