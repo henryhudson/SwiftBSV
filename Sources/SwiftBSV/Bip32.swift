@@ -16,7 +16,7 @@ import secp256k1
  * Bip32 is hierarchical deterministic wallets
  */
 
-public struct Bip32 {
+public struct Bip32: Sendable {
 
     public enum DerivationNode {
         case hardened(UInt32)

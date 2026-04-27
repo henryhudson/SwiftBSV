@@ -98,29 +98,55 @@ public final class Crypto {
         return try! ECDSA.verifySignatureCompact(signature, message: message, publicKeyData: publicKeyData)
     }
 
-    public static func verifySigData(for tx: Transaction, inputIndex: Int, utxo: TransactionOutput, sigData: Data, pubKeyData: Data) throws -> Bool {
+    /// Verify a Bitcoin transaction signature against a UTXO's locking script.
+    ///
+    /// `sigData` is the wire-format signature: a DER-encoded ECDSA signature
+    /// followed by a single sighash-type byte (e.g. `0x41` for SIGHASH_ALL |
+    /// SIGHASH_FORKID, the BSV standard). The function strips the trailing
+    /// sighash byte, computes the message digest the signer would have
+    /// produced, and verifies the DER signature against that digest with
+    /// the supplied compressed/uncompressed public key.
+    ///
+    /// Used from `OP_CHECKSIG` and `OP_CHECKMULTISIG`. Previously this method
+    /// crashed with `fatalError("TODO")` — any script execution path that
+    /// hit those opcodes would terminate the process. Now implemented via
+    /// the `TransactionInputSigner.signatureHash` digest and
+    /// `ECDSA.verifySignature` (DER) primitives.
+    public static func verifySigData(
+        for tx: Transaction,
+        inputIndex: Int,
+        utxo: TransactionOutput,
+        sigData: Data,
+        pubKeyData: Data
+    ) throws -> Bool {
+        guard let sighashByte = sigData.last else {
+            throw OpCodeExecutionError.error("SigData is empty — cannot verify signature.")
+        }
+        let sighashType = SighashType(ui8: sighashByte)
+        // BSV transactions use SIGHASH_FORKID (BIP143) by default;
+        // legacy pre-fork digests are still supported for replaying
+        // historic transactions or running the scripted-test vectors.
+        let signatureVersion: SignatureVersion = sighashType.hasForkId ? .forkId : .legacy
 
-        fatalError("TODO")
+        // Strip the trailing sighash-type byte to recover the pure DER signature.
+        let signature = Data(sigData.dropLast())
 
-//        // Hash type is one byte tacked on to the end of the signature. So the signature shouldn't be empty.
-//        guard !sigData.isEmpty else {
-//            throw ScriptMachineError.error("SigData is empty.")
-//        }
-//        // Extract hash type from the last byte of the signature.
-//        let helper: SignatureHashHelper
-//        if let hashType = BCHSighashType(rawValue: sigData.last!) {
-//            helper = BCHSignatureHashHelper(hashType: hashType)
-//        } else if let hashType = BTCSighashType(rawValue: sigData.last!) {
-//            helper = BTCSignatureHashHelper(hashType: hashType)
-//        } else {
-//            throw ScriptMachineError.error("Unknown sig hash type")
-//        }
-//
-//        // Strip that last byte to have a pure signature.
-//        let sighash: Data = helper.createSignatureHash(of: tx, for: utxo, inputIndex: inputIndex)
-//        let signature: Data = sigData.dropLast()
-//
-//        return try ECDSA.verifySignature(signature, message: sighash, publicKeyData: pubKeyData)
+        // For non-segwit P2PKH (the BSV standard locking pattern) the
+        // subScript is the UTXO's locking script. A more general impl
+        // would honour OP_CODESEPARATOR scoping, but every BSV-standard
+        // script template is OP_CODESEPARATOR-free.
+        let subScript = Script(data: utxo.lockingScript) ?? Script()
+
+        let sighash = TransactionInputSigner.signatureHash(
+            tx: tx,
+            signatureVersion: signatureVersion,
+            sighashType: sighashType,
+            nIn: inputIndex,
+            subScript: subScript,
+            value: utxo.value
+        )
+
+        return try ECDSA.verifySignature(signature, message: sighash, publicKeyData: pubKeyData)
     }
 
     public static func computePublicKey(fromPrivateKey privateKey: Data, compressed: Bool) -> Data {

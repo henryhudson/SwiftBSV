@@ -17,12 +17,12 @@ private let SIGHASH_ANYONECANPAY: UInt8 = 0x80 // 10000000
 
 private let SIGHASH_OUTPUT_MASK: UInt8 = 0x1f // 00011111
 
-public enum SignatureVersion: Equatable {
+public enum SignatureVersion: Equatable, Sendable {
     case forkId
     case legacy
 }
 
-public enum SighashBase: UInt8, Equatable {
+public enum SighashBase: UInt8, Equatable, Sendable {
     case unsupported = 0
     case all = 1
     case none = 2
@@ -33,7 +33,7 @@ public enum SighashBase: UInt8, Equatable {
     }
 }
 
-public enum SighashFlags: UInt8, Equatable {
+public enum SighashFlags: UInt8, Equatable, Sendable {
     case SIGHASH_ALL = 1
     case SIGHASH_NONE = 2
     case SIGHASH_SINGLE = 3
@@ -44,7 +44,7 @@ public enum SighashFlags: UInt8, Equatable {
 // Based on
 // https://github.com/bitcoin-sv/bitcoin-sv/blob/d9b12a23dbf0d2afc5f488fa077d762b302ba873/src/script/sighashtype.h#L37
 
-public struct SighashType {
+public struct SighashType: Sendable {
     public let sighash: UInt32
 
     public var baseType: SighashBase {

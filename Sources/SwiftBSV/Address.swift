@@ -8,7 +8,7 @@
 
 import Foundation
 
-public struct Address {
+public struct Address: Sendable {
 
     let network: Network
     let versionByteNum: UInt8

@@ -8,7 +8,7 @@
 
 import Foundation
 
-public struct PrivateKey {
+public struct PrivateKey: Sendable {
 
     /// The BInt of the private key
     public let bn: BInt

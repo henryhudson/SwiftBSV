@@ -9,7 +9,7 @@
 import Foundation
 
 /// The Bitcoin SV Network configuration
-public enum Network {
+public enum Network: Sendable {
 
     /// The BitcoinSV Main Network
     case mainnet

@@ -7,7 +7,7 @@
 //  Copyright © 2018 yuzushioh. All rights reserved.
 //
 
-public enum WordList {
+public enum WordList: Sendable {
     case english
     case japanese
     case korean

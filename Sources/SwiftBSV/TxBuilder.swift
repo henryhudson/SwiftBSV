@@ -316,7 +316,11 @@ public class TxBuilder {
         }
 
         guard let scriptChunk = nScriptChunk else {
-            fatalError()
+            // The branches above set nScriptChunk to 0 in every reachable
+            // path; reaching this guard means a future code change broke
+            // that invariant. Surface that explicitly so a stack trace
+            // points at the right spot instead of an empty fatalError.
+            fatalError("TxBuilder.signWithKeyPairs: nScriptChunk is nil — control flow above must always assign it")
         }
 
         let txHashBuf = txIn.previousOutput.hash
@@ -328,7 +332,10 @@ public class TxBuilder {
         }
 
         if txOut == nil {
-            fatalError()
+            // Caller passed neither a `txOut` nor populated `uTxOutMap`
+            // for this previous-output. Surfacing the txid:vout makes
+            // the misuse traceable instead of a bare fatalError.
+            fatalError("TxBuilder.signWithKeyPairs: missing prevOut for \(txHashBuf.hex):\(txOutNum) — pass txOut: or pre-populate uTxOutMap")
         }
 
         let outputScript = txOut!.lockingScript

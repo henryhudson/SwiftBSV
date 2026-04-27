@@ -8,7 +8,7 @@
 
 import Foundation
 
-public struct PublicKey {
+public struct PublicKey: Sendable {
 
     /// The Point of the public key on the curve.
     public let point: Point

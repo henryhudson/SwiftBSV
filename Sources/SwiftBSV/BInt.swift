@@ -166,7 +166,14 @@ public struct BInt:
     SignedNumeric, // Implies Numeric, Equatable, ExpressibleByIntegerLiteral
     BinaryInteger, // Implies Hashable, CustomStringConvertible, Strideable, Comparable
     ExpressibleByFloatLiteral,
-    Codable
+    Codable,
+    // `@unchecked Sendable` because the underlying `Limbs` ([UInt64]) array
+    // isn't itself formally Sendable in older Swift toolchains. BInt is a
+    // value type with copy-on-write semantics, so sharing across actors is
+    // safe in practice — mutations produce new values rather than racing on
+    // shared storage. Required so consumers (PublicKey, Point, PrivateKey)
+    // can compose into properly Sendable types.
+    @unchecked Sendable
 {
     //
     //
@@ -2193,7 +2200,8 @@ public struct BDouble:
     SignedNumeric,
     Comparable,
     Hashable,
-    Codable
+    Codable,
+    @unchecked Sendable  // Same rationale as BInt above.
 {
     //
     //

@@ -12,7 +12,7 @@ import Foundation
 // We don't do any math on them in Swift, so why add the complication? We can simply store the
 // backing Data in the point, and defer to the secp256k1 lib to do the maths...
 
-public struct Point {
+public struct Point: Sendable {
 
     // From the secp256k1 curve definition
     // https://github.com/indutny/elliptic/blob/master/lib/elliptic/curves.js#L176

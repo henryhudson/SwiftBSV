@@ -76,7 +76,10 @@ public final class ECDSA {
                 )
             }
         }
-        guard status == 1 else { fatalError() }
+        // secp256k1_ecdsa_sign returns 1 on success; 0 means the secp256k1
+        // signing function couldn't produce a signature (extremely rare —
+        // would need a malformed private key or an internal lib failure).
+        guard status == 1 else { fatalError("ECDSA.signMessage: secp256k1_ecdsa_sign returned \(status)") }
 
         let normalizedsig = UnsafeMutablePointer<secp256k1_ecdsa_signature>.allocate(capacity: 1)
         defer { normalizedsig.deallocate() }
@@ -90,7 +93,7 @@ public final class ECDSA {
                 $0.bindMemory(to: UInt8.self).baseAddress.unsafelyUnwrapped,
                 &length,
                 normalizedsig
-            ) }) == 1 else { fatalError() }
+            ) }) == 1 else { fatalError("ECDSA.signMessage: secp256k1_ecdsa_signature_serialize_der failed (output buffer too small or internal error)") }
         der.count = length
 
         return der
