@@ -56,12 +56,19 @@ public struct BitcoinSignedMessage {
         sig += signature.r
         sig += signature.s
 
-        let publicKeyBytes = try! Secp256k1.recoverCompact(
-            msg: [UInt8](hashBuf),
-            sig: [UInt8](sig),
-            recID: Secp256k1.RecoveryID(signature.recovery!),
-            compression: signature.isCompressed! ? .compressed : .uncompressed
-        )
+        // Tampered signatures legitimately fail recovery — return false rather
+        // than crashing the caller. Same applies if `recovery` or `isCompressed`
+        // were absent from the parsed signature.
+        guard let recovery = signature.recovery,
+              let isCompressed = signature.isCompressed,
+              let publicKeyBytes = try? Secp256k1.recoverCompact(
+                msg: [UInt8](hashBuf),
+                sig: [UInt8](sig),
+                recID: Secp256k1.RecoveryID(recovery),
+                compression: isCompressed ? .compressed : .uncompressed
+              ) else {
+            return false
+        }
 
         guard let publicKey = PublicKey(fromDer: Data(publicKeyBytes)) else {
             return false
