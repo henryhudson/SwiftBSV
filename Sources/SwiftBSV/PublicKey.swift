@@ -36,6 +36,11 @@ public struct PublicKey {
     ///   - buffer: Buffer containing the DER formatted PublicKey. This can be in the compressed, or uncompressed format.
     ///   - isStrict: See above discussion
     public init?(fromDer buffer: Data, isStrict strict: Bool = true) {
+        // Materialize a zero-indexed copy so integer subscript access (`buffer[0]`,
+        // `buffer[1..<33]`, etc.) is safe even when the caller passed in a `Data`
+        // slice. Data slicing preserves the parent's indices — without this line,
+        // `someData[4..<37]` passed in as `buffer` would crash on `buffer[0]`.
+        let buffer = Data(buffer)
         /// The buffer is uncompressed, and contains the X and Y coordinate of the Point
         if buffer[0] == 0x04 || (!strict && (buffer[0] == 0x06 || buffer[0] == 0x07)) {
 

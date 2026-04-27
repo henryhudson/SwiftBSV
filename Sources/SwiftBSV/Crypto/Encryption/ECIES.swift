@@ -109,8 +109,12 @@ public struct ECIESEncryption {
             throw ECIESError.invalidCiphertext
         }
 
-        // 2. Extract sender's public key
-        let senderPubData = ciphertext[4..<37]
+        // 2. Extract sender's public key.
+        // `Data(...)` materializes a zero-indexed copy — without it, `ciphertext`
+        // slicing preserves parent indices and `PublicKey(fromDer:)` would crash
+        // on `buffer[0]`. PublicKey now defends against this internally too, but
+        // making it explicit at the call-site documents the wire-format extraction.
+        let senderPubData = Data(ciphertext[4..<37])
         guard let senderPublicKey = PublicKey(fromDer: senderPubData) else {
             throw ECIESError.invalidPublicKey
         }
