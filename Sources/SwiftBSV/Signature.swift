@@ -52,6 +52,9 @@ struct Signature {
 
     /// The format used in the Bitcoin Signed Message
     init?(fromCompact buffer: Data) {
+        // Materialize a zero-indexed copy so `buffer[0]` and the slice
+        // `buffer[1..<buffer.count]` below are safe across slice callers.
+        let buffer = Data(buffer)
         guard buffer.count == 1 + 32 + 32 else {
             return nil
         }

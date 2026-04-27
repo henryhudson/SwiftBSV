@@ -44,6 +44,9 @@ public struct Address {
     }
 
     init?(buffer: Data, network: Network = .mainnet) {
+        // Materialize a zero-indexed copy so `buffer[0]` and the suffix
+        // computation below are safe even when the caller passed a slice.
+        let buffer = Data(buffer)
         guard buffer.count == 1 + 20 else {
             return nil
         }

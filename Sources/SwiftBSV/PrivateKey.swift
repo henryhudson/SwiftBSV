@@ -61,6 +61,10 @@ public struct PrivateKey {
     }
 
     public init(buffer: Data, network: Network = .mainnet) {
+        // Materialize a zero-indexed copy so the integer subscripts below
+        // (`buffer[0]`, `buffer[33]`, `buffer[1..<33]`) are safe regardless
+        // of whether the caller passed a `Data` slice.
+        let buffer = Data(buffer)
         if buffer.count == 1 + 32 + 1 && buffer[1 + 32 + 1 - 1] == 1 {
             isCompressed = true
         } else if buffer.count == 1 + 32 {
