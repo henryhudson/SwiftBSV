@@ -74,16 +74,30 @@ public struct ECIESEncryption {
             throw ECIESError.encryptionFailed
         }
 
-        // 5. HMAC-SHA256 over ciphertext
+        // 5. HMAC-SHA256 over `magic || sender_pubkey || ciphertext`.
+        // The MAC must cover the full payload that's transmitted; HMACing
+        // only the AES ciphertext silently allows an attacker to swap in
+        // a different sender pubkey while the HMAC still validates. This
+        // is also the wire shape the BRC-2 spec and @bsv/sdk's
+        // electrumEncrypt produce, so an HMAC over just the ciphertext
+        // would never decrypt their messages (and vice versa) — i.e. it
+        // wasn't actually wire-compatible with @bsv/sdk despite the file
+        // header's claim. Fixed cross-implementation interop test surfaces
+        // this; see Henceforth's BRC100Interop_Tests for vectors.
+        let senderPubData = senderPrivateKey.publicKey.toDer()
+        var macInput = [UInt8]()
+        macInput.append(contentsOf: [UInt8](magic))
+        macInput.append(contentsOf: [UInt8](senderPubData))
+        macInput.append(contentsOf: ciphertext)
+
         let hmac: [UInt8]
         do {
-            hmac = try HMAC(key: kM, variant: .sha2(.sha256)).authenticate(ciphertext)
+            hmac = try HMAC(key: kM, variant: .sha2(.sha256)).authenticate(macInput)
         } catch {
             throw ECIESError.encryptionFailed
         }
 
         // 6. Assemble: magic + sender pubkey + ciphertext + hmac
-        let senderPubData = senderPrivateKey.publicKey.toDer()
         var result = Data(capacity: 4 + 33 + ciphertext.count + 32)
         result.append(magic)                    // 4 bytes
         result.append(senderPubData)            // 33 bytes (compressed)
@@ -134,13 +148,20 @@ public struct ECIESEncryption {
         let kM = Array(hash[32..<64])
 
         // 6. Verify HMAC before decryption (authenticate-then-decrypt).
-        // Use a constant-time comparison so a Bleichenbacher-style timing
-        // probe cannot recover the HMAC byte-by-byte by measuring how
-        // long the reject takes. Plain `==` on `[UInt8]` short-circuits
-        // on the first mismatching byte and leaks prefix-match length.
+        // The MAC covers `magic || sender_pubkey || ciphertext` (per BRC-2
+        // and @bsv/sdk electrumDecrypt), NOT just the ciphertext —
+        // recompute over the same bytes the sender authenticated. Use a
+        // constant-time comparison so a Bleichenbacher-style timing probe
+        // cannot recover the HMAC byte-by-byte by measuring how long the
+        // reject takes. Plain `==` on `[UInt8]` short-circuits on the
+        // first mismatching byte and leaks prefix-match length.
+        var macInput = [UInt8]()
+        macInput.append(contentsOf: [UInt8](magic))
+        macInput.append(contentsOf: [UInt8](senderPubData))
+        macInput.append(contentsOf: encryptedData)
         let expectedHMAC: [UInt8]
         do {
-            expectedHMAC = try HMAC(key: kM, variant: .sha2(.sha256)).authenticate(encryptedData)
+            expectedHMAC = try HMAC(key: kM, variant: .sha2(.sha256)).authenticate(macInput)
         } catch {
             throw ECIESError.hmacVerificationFailed
         }
