@@ -133,14 +133,18 @@ public struct ECIESEncryption {
         let kE = Array(hash[16..<32])
         let kM = Array(hash[32..<64])
 
-        // 6. Verify HMAC before decryption (authenticate-then-decrypt)
+        // 6. Verify HMAC before decryption (authenticate-then-decrypt).
+        // Use a constant-time comparison so a Bleichenbacher-style timing
+        // probe cannot recover the HMAC byte-by-byte by measuring how
+        // long the reject takes. Plain `==` on `[UInt8]` short-circuits
+        // on the first mismatching byte and leaks prefix-match length.
         let expectedHMAC: [UInt8]
         do {
             expectedHMAC = try HMAC(key: kM, variant: .sha2(.sha256)).authenticate(encryptedData)
         } catch {
             throw ECIESError.hmacVerificationFailed
         }
-        guard expectedHMAC == receivedHMAC else {
+        guard ECIESEncryption.constantTimeEquals(expectedHMAC, receivedHMAC) else {
             throw ECIESError.hmacVerificationFailed
         }
 
@@ -152,6 +156,23 @@ public struct ECIESEncryption {
         } catch {
             throw ECIESError.decryptionFailed
         }
+    }
+
+    // MARK: - Constant-Time Comparison
+
+    /// Constant-time byte-array equality. Iterates the full length of both
+    /// inputs (XOR-OR-accumulate) so the wall-clock cost cannot be used to
+    /// infer how many leading bytes match. Used for HMAC verification —
+    /// `==` on `[UInt8]` short-circuits on the first mismatching byte and
+    /// leaks prefix-match length, which a Bleichenbacher-style probe
+    /// could exploit to recover the HMAC byte-by-byte over many attempts.
+    static func constantTimeEquals(_ lhs: [UInt8], _ rhs: [UInt8]) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        var diff: UInt8 = 0
+        for i in 0..<lhs.count {
+            diff |= lhs[i] ^ rhs[i]
+        }
+        return diff == 0
     }
 
     // MARK: - String Convenience
