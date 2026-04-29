@@ -6,7 +6,8 @@
 //  Wire-compatible with @bsv/sdk EncryptedMessage and other BSV wallets.
 //
 //  Wire format: "BIE1" (4 bytes) || sender_pubkey (33 bytes) || AES-CBC ciphertext || HMAC-SHA256 (32 bytes)
-//  Key derivation: SHA-512(ECDH_shared_point.x) → iv[0:16], kE[16:32], kM[32:64]
+//  Key derivation: SHA-512(compressed_encoding_of_shared_point, 33 bytes) → iv[0:16], kE[16:32], kM[32:64]
+//  HMAC input: BIE1 || sender_pubkey || ciphertext (NOT just ciphertext — the MAC must cover the whole transmitted payload).
 //
 //  Reference: BRC-2 specification
 //
@@ -53,14 +54,18 @@ public struct ECIESEncryption {
         senderPrivateKey: PrivateKey,
         recipientPublicKey: PublicKey
     ) throws -> Data {
-        // 1. ECDH: compute shared point
+        // 1. ECDH: compute shared point (returned as 33-byte compressed encoding)
         let sharedPoint = try computeECDH(privateKey: senderPrivateKey, publicKey: recipientPublicKey)
 
-        // 2. Extract x-coordinate (skip 0x02/0x03 prefix byte)
-        let xCoordinate = [UInt8](sharedPoint[1..<33])
-
-        // 3. SHA-512 key derivation
-        let hash = xCoordinate.sha512()
+        // 2. SHA-512 key derivation over the full 33-byte compressed
+        // encoding of the shared point — not just the X coordinate. The
+        // prefix byte encodes Y's parity, which is public information
+        // once X is known, so including it leaks nothing; @bsv/sdk's
+        // electrumEncrypt and the canonical Electrum implementation do
+        // the same. SwiftBSV previously hashed only the 32-byte X here,
+        // which produced different (incompatible) IV/kE/kM and silently
+        // broke wire interop despite the file header's claim.
+        let hash = sharedPoint.sha512()
         let iv = Array(hash[0..<16])      // 16 bytes: AES IV
         let kE = Array(hash[16..<32])     // 16 bytes: AES key
         let kM = Array(hash[32..<64])     // 32 bytes: HMAC key
@@ -137,12 +142,13 @@ public struct ECIESEncryption {
         let encryptedData = [UInt8](ciphertext[37..<(ciphertext.count - 32)])
         let receivedHMAC = [UInt8](ciphertext[(ciphertext.count - 32)...])
 
-        // 4. ECDH
+        // 4. ECDH (returned as 33-byte compressed encoding)
         let sharedPoint = try computeECDH(privateKey: recipientPrivateKey, publicKey: senderPublicKey)
 
-        // 5. Key derivation
-        let xCoordinate = [UInt8](sharedPoint[1..<33])
-        let hash = xCoordinate.sha512()
+        // 5. Key derivation: SHA-512 over the full compressed point.
+        // See the matching encrypt-path comment for the rationale —
+        // both sides must hash the same input or the IV/kE/kM differ.
+        let hash = sharedPoint.sha512()
         let iv = Array(hash[0..<16])
         let kE = Array(hash[16..<32])
         let kM = Array(hash[32..<64])
