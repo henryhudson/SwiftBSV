@@ -27,7 +27,32 @@ enum TxBuilderError: Error {
     case malformedLockingScript(nIn: Int)
 }
 
-public class TxBuilder {
+/// `TxBuilder` is a value type. The public API is split by intent:
+///
+/// **Configuration setters** (`setNLockTime`, `setVersion`, `setFeePerKb`,
+/// `setChangeAddress`, `setChangeScript`) are **non-mutating** and return
+/// a new builder. Designed for the chain-and-capture pattern:
+///
+///     let txb = TxBuilder()
+///         .setFeePerKb(500)
+///         .setChangeAddress(addr)
+///         .setNLockTime(0)
+///
+/// They deliberately drop `@discardableResult` — calling
+/// `b.setFeePerKb(500)` on a `var b` and discarding the return is a
+/// programmer error (no effect on `b`), and the compiler now warns.
+///
+/// **State-mutating ops** (`inputFromX`, `outputToX`, `addSigOperation`,
+/// `build`, `signInTx`, `fillSig`) are `mutating` and modify `self` in
+/// place. They keep `@discardableResult` (the mutation is real even when
+/// the return is discarded) and return `Self` for ergonomic chaining on
+/// `var` bindings.
+///
+/// Was a `class` for no reason — no shared identity, no inheritance, no
+/// reference-semantics requirement. Converting to `struct` removes a
+/// class of identity-vs-equality bugs and makes the configuration ⇄
+/// state-mutation split enforceable at the type level.
+public struct TxBuilder {
 
     private(set) public var transaction: Transaction = .empty
     private var transactionInputs: [TransactionInput] = []
@@ -61,39 +86,41 @@ public class TxBuilder {
 
     }
 
-    @discardableResult
+    // MARK: - Configuration setters (non-mutating, return new value)
+
     public func setNLockTime(_ nLockTime: UInt32) -> Self {
-        self.nLockTime = nLockTime
-        return self
+        var copy = self
+        copy.nLockTime = nLockTime
+        return copy
     }
 
-    @discardableResult
     public func setVersion(_ version: UInt32) -> Self {
-        self.version = version
-        return self
+        var copy = self
+        copy.version = version
+        return copy
     }
 
-    @discardableResult
     public func setFeePerKb(_ fee: UInt64) -> Self {
-        self.feePerKbNum = fee
-        return self
+        var copy = self
+        copy.feePerKbNum = fee
+        return copy
     }
 
-    @discardableResult
     public func setChangeAddress(_ changeAddress: Address) -> Self {
         let script: Script = Script.buildPublicKeyHashOut(pubKeyHash: changeAddress.hashBuffer)
-        setChangeScript(script)
-        return self
+        return setChangeScript(script)
     }
 
-    @discardableResult
     public func setChangeScript(_ changeScript: Script) -> Self {
-        self.changeScript = changeScript
-        return self
+        var copy = self
+        copy.changeScript = changeScript
+        return copy
     }
 
+    // MARK: - State-mutating ops (mutating, return Self for chaining on var)
+
     @discardableResult
-    public func inputFromScript(_ txHashBuffer: Data, txOutNum: UInt32, txOut: TransactionOutput, script: Script, nSequence: UInt32) -> Self {
+    public mutating func inputFromScript(_ txHashBuffer: Data, txOutNum: UInt32, txOut: TransactionOutput, script: Script, nSequence: UInt32) -> Self {
         let txIn = TransactionInput(
             previousOutput: TransactionOutPoint(
                 hash: txHashBuffer,
@@ -110,13 +137,13 @@ public class TxBuilder {
     }
 
     @discardableResult
-    public func addSigOperation(_ txHashBuf: Data, txOutNum: UInt32, nScriptChunk: UInt32, type: SigOperation.OperationType, addressString: String, nHashType: SighashType) -> Self {
+    public mutating func addSigOperation(_ txHashBuf: Data, txOutNum: UInt32, nScriptChunk: UInt32, type: SigOperation.OperationType, addressString: String, nHashType: SighashType) -> Self {
         sigOperations.addOne(txHashBuf: txHashBuf, txOutNum: txOutNum, nScriptChunk: nScriptChunk, addressString: addressString, nHashType: nHashType)
         return self
     }
 
     @discardableResult
-    public func inputFromPubKeyHash(txHashBuffer: Data, txOutNum: UInt32, txOut: TransactionOutput, pubKey: PublicKey, nSequence: UInt32 = 0xffffffff, nHashType: SighashType = SighashType.BSV.ALL) -> Self {
+    public mutating func inputFromPubKeyHash(txHashBuffer: Data, txOutNum: UInt32, txOut: TransactionOutput, pubKey: PublicKey, nSequence: UInt32 = 0xffffffff, nHashType: SighashType = SighashType.BSV.ALL) -> Self {
 
         let transactionInput = TransactionInput.fromPubKeyHashOut(
             txHashBuf: txHashBuffer,
@@ -137,14 +164,14 @@ public class TxBuilder {
     }
 
     @discardableResult
-    public func outputToAddress(value: UInt64, address: Address) -> Self {
+    public mutating func outputToAddress(value: UInt64, address: Address) -> Self {
         let script: Script = Script.buildPublicKeyHashOut(pubKeyHash: address.hashBuffer)
         outputToScript(value: value, script: script)
         return self
     }
 
     @discardableResult
-    public func outputToScript(value: UInt64, script: Script) -> Self {
+    public mutating func outputToScript(value: UInt64, script: Script) -> Self {
         let txOut = TransactionOutput(value: value, lockingScript: script.data)
         transactionOutputs.append(txOut)
         return self
@@ -153,7 +180,7 @@ public class TxBuilder {
     /// Add the outputs to the transaction and return the total amount.
     /// Side-effect (appending to `transaction`) is intentional and shared
     /// with the caller; pure sum is folded in via `reduce(into:)`.
-    func buildOutputs() -> UInt64 {
+    mutating func buildOutputs() -> UInt64 {
         // TODO: reject outputs below dust unless they are OP_RETURN /
         // safe-data-out (consensus-relayed null-data scripts).
         transactionOutputs.reduce(into: UInt64(0)) { total, txOut in
@@ -166,7 +193,7 @@ public class TxBuilder {
     /// `outAmount` is met (plus any requested extra). Genuinely sequential
     /// because of the early-exit, so a `for` loop is the right shape;
     /// only the accumulator type was tightened to `UInt64`.
-    func buildInputs(outAmount: UInt64, extraInputsNum: UInt32 = 0) throws -> UInt64 {
+    mutating func buildInputs(outAmount: UInt64, extraInputsNum: UInt32 = 0) throws -> UInt64 {
         var totalInputAmount: UInt64 = 0
         var extraInputsNum = extraInputsNum
 
@@ -241,7 +268,7 @@ public class TxBuilder {
     }
 
     @discardableResult
-    public func build(useAllInputs: Bool) throws -> TxBuilder {
+    public mutating func build(useAllInputs: Bool) throws -> TxBuilder {
         var minFeeAmount: UInt64 = 0
         self.changeAmount = 0
 
@@ -339,7 +366,7 @@ public class TxBuilder {
     /// `throws` rather than `fatalError`s on bad inputs (missing prev-out,
     /// unparseable scripts) so callers can surface the error in UI.
     @discardableResult
-    public func signInTx(nIn: Int, privateKey: PrivateKey, txOut: TransactionOutput? = nil, nScriptChunk: Int? = nil, sighashType: SighashType = SighashType.BSV.ALL, signatureVersion: SignatureVersion = .forkId) throws -> Self {
+    public mutating func signInTx(nIn: Int, privateKey: PrivateKey, txOut: TransactionOutput? = nil, nScriptChunk: Int? = nil, sighashType: SighashType = SighashType.BSV.ALL, signatureVersion: SignatureVersion = .forkId) throws -> Self {
 
         var nScriptChunk = nScriptChunk
         let txIn = transaction.inputs[nIn]
@@ -380,7 +407,7 @@ public class TxBuilder {
         return self
     }
 
-    func fillSig(nIn: Int, nScriptChunk: Int, sig: Data, sighashType: SighashType, publicKey: PublicKey) {
+    mutating func fillSig(nIn: Int, nScriptChunk: Int, sig: Data, sighashType: SighashType, publicKey: PublicKey) {
         transaction.fillSig(nIn: nIn, nScriptChunk: nScriptChunk, sig: sig, sighashType: sighashType, publicKey: publicKey)
     }
 
