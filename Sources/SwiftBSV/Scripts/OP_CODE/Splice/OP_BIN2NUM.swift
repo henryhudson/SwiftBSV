@@ -1,32 +1,37 @@
 //
 //  OP_BIN2NUM.swift
 //
-//  Copyright © 2018 BitcoinKit developers
+//  BSV consensus: re-encode a byte sequence as a minimal script number.
 //
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
+//  Stack: ( bin -- num )
 //
-//  The above copyright notice and this permission notice shall be included in
-//  all copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-//  THE SOFTWARE.
+//  Decodes `bin` as a script-num buffer (little-endian, MSB sign bit) and
+//  re-emits it in the canonical minimal form: trailing zero bytes are
+//  stripped, the sign bit migrates to the new MSB. Empty input maps to
+//  empty output (= zero). Fails if the result exceeds `BInt.scriptNumMaxBytes`.
 //
 
 import Foundation
 
-// convert byte sequence x into a numeric value
 public struct OpBin2Num: OpCodeProtocol {
     public var value: UInt8 { return 0x81 }
     public var name: String { return "OP_BIN2NUM" }
 
+    public func mainProcess(_ context: ScriptExecutionContext) throws {
+        try context.assertStackHeightGreaterThanOrEqual(1)
+
+        let bin = context.stack.removeLast()
+        let minimal = BInt(fromScriptNumBuffer: bin).toScriptNumBuffer()
+
+        // BSV pre-Genesis caps script-arithmetic numbers at 4 bytes. Most
+        // BSV nodes today still enforce this for OP_BIN2NUM specifically —
+        // the post-Genesis script size loosening did NOT lift the
+        // arithmetic operand width. Keep aligned with what
+        // `ScriptExecutionContext.number(at:)` enforces (≤ 4 bytes).
+        guard minimal.count <= 4 else {
+            throw OpCodeExecutionError.error("OP_BIN2NUM: result exceeds 4-byte script-num limit")
+        }
+
+        try context.pushToStack(minimal)
+    }
 }

@@ -51,74 +51,90 @@ class ScriptMachineTests: XCTestCase {
 
     }
 
+    /// End-to-end signature round-trip through `Crypto.verifySigData`
+    /// AND `ScriptMachine.verifyTransaction`. The original placeholder
+    /// referenced a testnet3 transaction by external txid plus types
+    /// that no longer exist on the public API (`BTCSignatureHashHelper`,
+    /// `PublicKey.pubkeyHash`); rewriting as a self-contained round-trip
+    /// keeps the testable invariant — "a tx I signed must verify locally"
+    /// — without depending on external chain state.
     func testCheck() throws {
-        try XCTSkipIf(true, "Test body is fully commented out — placeholder for a future testnet-3 sigcheck integration test")
-//
-//        // Transaction in testnet3
-//        // https://api.blockcypher.com/v1/btc/test3/txs/0189910c263c4d416d5c5c2cf70744f9f6bcd5feaf0b149b02e5d88afbe78992
-//        let prevTxID = "1524ca4eeb9066b4765effd472bc9e869240c4ecb5c1ee0edb40f8b666088231"
-//        // hash.reversed = txid
-//        let hash = Data(Data(hex: prevTxID)!.reversed())
-//        let index: UInt32 = 1
-//        let outpoint = TransactionOutPoint(hash: hash, index: index)
-//
-//        let balance: UInt64 = 169012961
-//        let amount: UInt64  =  50000000
-//        let fee: UInt64     =  10000000
-//        let toAddress = "mv4rnyY3Su5gjcDNzbMLKBQkBicCtHUtFB" // https://testnet.coinfaucet.eu/en/
-//
-//        let privateKey = try! PrivateKey(wif: "92pMamV6jNyEq9pDpY4f6nBy9KpV2cfJT4L5zDUYiGqyQHJfF1K")
-//
-//        let fromPublicKey = privateKey.publicKey()
-//        let fromPubKeyHash = Crypto.sha256ripemd160(fromPublicKey.data)
-//        let toPubKeyHash = Base58Check.decode(toAddress)!.dropFirst()
-//
-//        // unsigned tx
-//        let lockingScript1 = Script.buildPublicKeyHashOut(pubKeyHash: toPubKeyHash)
-//        let lockingScript2 = Script.buildPublicKeyHashOut(pubKeyHash: fromPubKeyHash)
-//
-//        let sending = TransactionOutput(value: amount, lockingScript: lockingScript1)
-//        let payback = TransactionOutput(value: balance - amount - fee, lockingScript: lockingScript2)
-//        let subScript = Data(hex: "76a9142a539adfd7aefcc02e0196b4ccf76aea88a1f47088ac")!
-//        let inputForSign = TransactionInput(previousOutput: outpoint, signatureScript: subScript, sequence: UInt32.max)
-//        let unsignedTx = Transaction(version: 1, inputs: [inputForSign], outputs: [sending, payback], lockTime: 0)
-//
-//        // sign
-//        let hashType: BTCSighashType = SighashType.BTC.ALL
-//        let utxoToSign = TransactionOutput(value: balance, lockingScript: subScript)
-//        let helper = BTCSignatureHashHelper(hashType: hashType)
-//        let _txHash = helper.createSignatureHash(of: unsignedTx, for: utxoToSign, inputIndex: 0)
-//        guard let signature: Data = try? Crypto.sign(_txHash, privateKey: privateKey) else {
-//            XCTFail("Failed to sign tx.")
-//            return
-//        }
-//
-//        // unlock script
-//        XCTAssertEqual(fromPublicKey.pubkeyHash.hex, "2a539adfd7aefcc02e0196b4ccf76aea88a1f470")
-//        let unlockScript: Script = try! Script()
-//            .appendData(signature + hashType.uint8)
-//            .appendData(fromPublicKey.data)
-//
-//        // signed tx
-//        let txin = TransactionInput(previousOutput: outpoint, signatureScript: unlockScript.data, sequence: UInt32.max)
-//        let signedTx = Transaction(version: 1, inputs: [txin], outputs: [sending, payback], lockTime: 0)
-//
-//        // crypto verify
-//        do {
-//            let sigData: Data = signature + hashType.uint8
-//            let pubkeyData: Data = fromPublicKey.data
-//            let result = try Crypto.verifySigData(for: signedTx, inputIndex: 0, utxo: utxoToSign, sigData: sigData, pubKeyData: pubkeyData)
-//            XCTAssertTrue(result)
-//        } catch (let err) {
-//            XCTFail("Crypto verifySigData failed. \(err)")
-//        }
-//
-//        // script machine verify
-//        do {
-//            let result = try ScriptMachine.verifyTransaction(signedTx: signedTx, inputIndex: 0, utxo: utxoToSign)
-//            XCTAssertTrue(result)
-//        } catch (let err) {
-//            XCTFail("Script machine verify failed. \(err)")
-//        }
+        let signer = PrivateKey(network: .mainnet)
+        let recipient = PrivateKey(network: .mainnet)
+
+        // Fabricate a previous-output the signer controls.
+        let prevTxid = Data(repeating: 0xcd, count: 32)
+        let utxo = TransactionOutput(
+            value: 169_012_961,
+            lockingScript: signer.publicKey.address.toTxOutputScript().data
+        )
+
+        // Build an unsigned spending tx — placeholder signatureScript
+        // matches the locking script (`Transaction.sign` ignores it).
+        let unsignedInput = TransactionInput(
+            previousOutput: TransactionOutPoint(hash: prevTxid, index: 1),
+            signatureScript: utxo.lockingScript,
+            sequence: UInt32.max
+        )
+        let payOut = TransactionOutput(
+            value: 50_000_000,
+            lockingScript: recipient.publicKey.address.toTxOutputScript().data
+        )
+        let changeOut = TransactionOutput(
+            value: 169_012_961 - 50_000_000 - 10_000_000,
+            lockingScript: signer.publicKey.address.toTxOutputScript().data
+        )
+        let unsignedTx = Transaction(
+            version: 1,
+            inputs: [unsignedInput],
+            outputs: [payOut, changeOut],
+            lockTime: 0
+        )
+
+        // Sign with FORKID (BSV consensus default).
+        let sighashType = SighashType.BSV.ALL
+        let subScript = Script(data: utxo.lockingScript)!
+        let derSig = unsignedTx.sign(
+            privateKey: signer,
+            sighashType: sighashType,
+            nIn: 0,
+            subScript: subScript,
+            value: utxo.value
+        )
+        let wireSig = derSig + Data([UInt8(sighashType.sighash & 0xff)])
+
+        // Construct the unlocking scriptSig (sig, then pubkey).
+        let unlockScript = try Script()
+            .appendData(wireSig)
+            .appendData(signer.publicKey.toDer())
+        let signedInput = TransactionInput(
+            previousOutput: unsignedInput.previousOutput,
+            signatureScript: unlockScript.data,
+            sequence: UInt32.max
+        )
+        let signedTx = Transaction(
+            version: 1,
+            inputs: [signedInput],
+            outputs: [payOut, changeOut],
+            lockTime: 0
+        )
+
+        // 1. Direct Crypto.verifySigData check — the path used by OP_CHECKSIG.
+        let cryptoResult = try Crypto.verifySigData(
+            for: signedTx,
+            inputIndex: 0,
+            utxo: utxo,
+            sigData: wireSig,
+            pubKeyData: signer.publicKey.toDer()
+        )
+        XCTAssertTrue(cryptoResult, "Crypto.verifySigData rejected a signature it should accept")
+
+        // 2. Full ScriptMachine round-trip — runs unlock + lock + OP_CHECKSIG.
+        let machineResult = try ScriptMachine.verifyTransaction(
+            signedTx: signedTx,
+            inputIndex: 0,
+            utxo: utxo
+        )
+        XCTAssertTrue(machineResult, "ScriptMachine.verifyTransaction rejected a tx it should accept")
     }
 }

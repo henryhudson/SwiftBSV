@@ -595,12 +595,72 @@ class OpCodeTests: XCTestCase {
         }
     }
 
+    /// Round-trip a legacy (pre-FORKID) signature through OP_CHECKSIG.
+    /// Previously skipped because the digest-reversal bug between
+    /// `Transaction.sign` and `Crypto.verifySigData` meant local
+    /// verification couldn't succeed; with the reversal fix in place
+    /// this is the regression test for that path.
     func testOpCheckSigBTC() throws {
-        try XCTSkipIf(true, "TODO: not implemented yet — placeholder retained for the test plan")
+        try runCheckSigRoundTrip(sighashType: SighashType.BTC.ALL,
+                                 signatureVersion: .legacy)
     }
 
+    /// Round-trip a BSV (FORKID, BIP-143) signature through OP_CHECKSIG.
     func testOpCheckSigBSV() throws {
-        try XCTSkipIf(true, "TODO: not implemented yet — placeholder retained for the test plan")
+        try runCheckSigRoundTrip(sighashType: SighashType.BSV.ALL,
+                                 signatureVersion: .forkId)
+    }
+
+    /// Shared implementation: generate a key, fabricate a "previous"
+    /// outpoint, build a 1-in/1-out spending tx, sign with the chosen
+    /// sighash convention, push (sig+sighashByte, pubkey) onto a context
+    /// bound to the spending tx, and assert OP_CHECKSIG leaves TRUE on
+    /// the stack.
+    private func runCheckSigRoundTrip(sighashType: SighashType,
+                                      signatureVersion: SignatureVersion) throws {
+        let signer = PrivateKey(network: .mainnet)
+        let utxo = TransactionOutput(
+            value: 100_000,
+            lockingScript: signer.publicKey.address.toTxOutputScript().data
+        )
+        let prev = TransactionOutPoint(
+            hash: Data(repeating: 0xab, count: 32),
+            index: 0
+        )
+        let txin = TransactionInput(
+            previousOutput: prev,
+            signatureScript: utxo.lockingScript,
+            sequence: 0xffffffff
+        )
+        let txout = TransactionOutput(
+            value: 50_000,
+            lockingScript: PrivateKey(network: .mainnet).publicKey.address.toTxOutputScript().data
+        )
+        let tx = Transaction(version: 1, inputs: [txin], outputs: [txout], lockTime: 0)
+
+        let subScript = Script(data: utxo.lockingScript)!
+        let derSig = tx.sign(
+            privateKey: signer,
+            sighashType: sighashType,
+            nIn: 0,
+            subScript: subScript,
+            value: utxo.value,
+            signatureVersion: signatureVersion
+        )
+        let wireSig = derSig + Data([UInt8(sighashType.sighash & 0xff)])
+
+        // OP_CHECKSIG reads the transaction and UTXO off the context, so
+        // bind both via the dedicated initializer.
+        let ctx = ScriptExecutionContext(transaction: tx, utxoToVerify: utxo, inputIndex: 0)!
+        try ctx.pushToStack(wireSig)
+        try ctx.pushToStack(signer.publicKey.toDer())
+
+        try OpCode.OP_CHECKSIG.mainProcess(ctx)
+
+        XCTAssertEqual(ctx.stack.count, 1)
+        // pushToStack(_ bool: Bool) writes 0x01 for true, empty Data for false.
+        XCTAssertEqual(ctx.stack.last, Data([0x01]),
+                       "OP_CHECKSIG should leave TRUE on the stack for a valid signature")
     }
 
     func testOpInvalidOpCode() {
@@ -614,6 +674,65 @@ class OpCodeTests: XCTestCase {
             // success
         } catch let error {
             XCTFail("Shoud throw OpCodeExecutionError.error(\"OP_INVALIDOPCODE should not be executed.\", but threw \(error)")
+        }
+    }
+
+    // MARK: - OP_NUM2BIN / OP_BIN2NUM (BSV consensus, post-Genesis-restored)
+
+    func testOpNum2BinPadsToFixedWidth() throws {
+        // Stack ( 5, size=4 -- 05 00 00 00 )
+        try context.pushToStack(Int32(5))
+        try context.pushToStack(Int32(4))
+        try OpCode.OP_NUM2BIN.mainProcess(context)
+
+        XCTAssertEqual(context.stack.count, 1)
+        XCTAssertEqual(context.stack.last, Data([0x05, 0x00, 0x00, 0x00]))
+    }
+
+    func testOpNum2BinPreservesSign() throws {
+        // -5 in script-num form is 0x85; after NUM2BIN to 4 bytes the sign bit
+        // migrates onto the new MSB: 05 00 00 80
+        try context.pushToStack(Int32(-5))
+        try context.pushToStack(Int32(4))
+        try OpCode.OP_NUM2BIN.mainProcess(context)
+
+        XCTAssertEqual(context.stack.last, Data([0x05, 0x00, 0x00, 0x80]))
+    }
+
+    func testOpNum2BinFailsWhenInputDoesNotFit() {
+        // 0x0100 = 256 needs 2 bytes; size=1 must fail.
+        try? context.pushToStack(Data([0x00, 0x01]))
+        try? context.pushToStack(Int32(1))
+
+        XCTAssertThrowsError(try OpCode.OP_NUM2BIN.mainProcess(context))
+    }
+
+    func testOpBin2NumStripsTrailingZeros() throws {
+        // 05 00 00 00 (NUM2BIN padded) → 0x05 (minimal)
+        try context.pushToStack(Data([0x05, 0x00, 0x00, 0x00]))
+        try OpCode.OP_BIN2NUM.mainProcess(context)
+
+        XCTAssertEqual(context.stack.last, Data([0x05]))
+    }
+
+    func testOpBin2NumPreservesSign() throws {
+        // 05 00 00 80 → 0x85 (minimal, negative)
+        try context.pushToStack(Data([0x05, 0x00, 0x00, 0x80]))
+        try OpCode.OP_BIN2NUM.mainProcess(context)
+
+        XCTAssertEqual(context.stack.last, Data([0x85]))
+    }
+
+    func testNum2BinBin2NumRoundTrip() throws {
+        // Round-trip: BIN2NUM(NUM2BIN(n, k)) == minimal(n) for small n, k ≥ minimal-width.
+        for n: Int32 in [-1024, -5, -1, 0, 1, 5, 1024] {
+            context.resetStack()
+            try context.pushToStack(n)
+            try context.pushToStack(Int32(4))
+            try OpCode.OP_NUM2BIN.mainProcess(context)
+            try OpCode.OP_BIN2NUM.mainProcess(context)
+
+            XCTAssertEqual(try context.number(at: -1), n, "round-trip failed for n=\(n)")
         }
     }
 }

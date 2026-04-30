@@ -14,6 +14,17 @@ enum TxBuilderError: Error {
     case invalidNumberOfOutputs
     case changeOutputLessThanDust
     case inputAmountLessThanOutputAmount
+    /// `signInTx` was called for a previous-output that wasn't
+    /// pre-populated in `uTxOutMap` and no `txOut` argument was passed.
+    /// Includes the txid:vout for traceability.
+    case missingPrevOut(txid: String, vout: UInt32)
+    /// `buildInputs` could not find the previous-output for one of the
+    /// added inputs in `uTxOutMap`.
+    case missingPrevOutDuringBuild(txid: String, vout: UInt32)
+    /// The signature script of an existing input could not be parsed.
+    case malformedSignatureScript(nIn: Int)
+    /// The locking (output) script of a referenced UTXO could not be parsed.
+    case malformedLockingScript(nIn: Int)
 }
 
 public class TxBuilder {
@@ -34,9 +45,11 @@ public class TxBuilder {
     private(set) var nLockTime: UInt32 = 0
     private(set) var version: UInt32 = 1
 
-    /// The desired fee per Kb
+    /// The desired fee per Kb (satoshis per 1000 bytes).
+    /// Integer rather than Float so fees are deterministic across
+    /// architectures — see `estimateFee` for the rounding rule.
     private(set) var dust: UInt64 = Network.mainnet.txBuilder.dust
-    private(set) var feePerKbNum: Float = Network.mainnet.txBuilder.feePerKb
+    private(set) var feePerKbNum: UInt64 = Network.mainnet.txBuilder.feePerKb
 
     public init() {
 
@@ -55,7 +68,7 @@ public class TxBuilder {
     }
 
     @discardableResult
-    public func setFeePerKb(_ fee: Float) -> Self {
+    public func setFeePerKb(_ fee: UInt64) -> Self {
         self.feePerKbNum = fee
         return self
     }
@@ -147,26 +160,29 @@ public class TxBuilder {
         return totalOutputValue
     }
 
-    func buildInputs(outAmount: UInt64, extraInputsNum: UInt32 = 0) -> UInt64 {
+    func buildInputs(outAmount: UInt64, extraInputsNum: UInt32 = 0) throws -> UInt64 {
         var totalInputAmount = UInt64()
         var extraInputsNum = extraInputsNum
 
         for txIn in transactionInputs {
-            if let txOut = uTxOutMap.get(txHashBuf: txIn.previousOutput.hash, txOutNum: txIn.previousOutput.index) {
-                totalInputAmount += txOut.value
-                transaction.addTransactionInput(txIn)
-
-                if totalInputAmount >= outAmount {
-                    if extraInputsNum <= 0 {
-                        break
-                    }
-                    extraInputsNum -= 1
-                }
-
-            } else {
-                fatalError("TxBuilder: Missing txOut in uTxOutMap")
+            guard let txOut = uTxOutMap.get(txHashBuf: txIn.previousOutput.hash, txOutNum: txIn.previousOutput.index) else {
+                // Caller appended an input without registering the
+                // matching previous-output in uTxOutMap. Surface txid:vout
+                // for traceability instead of crashing.
+                throw TxBuilderError.missingPrevOutDuringBuild(
+                    txid: txIn.previousOutput.hash.hex,
+                    vout: txIn.previousOutput.index
+                )
             }
+            totalInputAmount += txOut.value
+            transaction.addTransactionInput(txIn)
 
+            if totalInputAmount >= outAmount {
+                if extraInputsNum <= 0 {
+                    break
+                }
+                extraInputsNum -= 1
+            }
         }
 
         return totalInputAmount
@@ -204,9 +220,18 @@ public class TxBuilder {
     }
 
     func estimateFee(extraFeeAmount: UInt64 = 0) -> UInt64 {
-        // new style pays lower fees - rounds up to satoshi, not per kb:
-        let fee = Float(estimateSize()) / 1000 * feePerKbNum
-        return UInt64(fee) + extraFeeAmount
+        // Round UP. UInt64 division truncates; rounding down would let
+        // sub-satoshi fees fall through (e.g. a 250-byte tx at 500 sat/kb
+        // computes to exactly 125 sat — fine — but a 251-byte tx would
+        // compute to 125 sat with truncation when 126 sat is what the
+        // network wants). Rounding up never under-pays.
+        //
+        // Float math previously used here was non-deterministic across
+        // architectures and produced occasional "fee too low" rejections
+        // at the 0.5-sat boundary. UInt64 is exact and reproducible.
+        let size = UInt64(estimateSize())
+        let fee = (size * feePerKbNum + 999) / 1000
+        return fee + extraFeeAmount
     }
 
     @discardableResult
@@ -232,7 +257,7 @@ public class TxBuilder {
             let changeTxOut = TransactionOutput(value: changeAmount!, lockingScript: changeScript.data)
             transaction.addTransactionOutput(changeTxOut)
 
-            let inputAmount = buildInputs(outAmount: outputAmount, extraInputsNum: extraInputsNum)
+            let inputAmount = try buildInputs(outAmount: outputAmount, extraInputsNum: extraInputsNum)
 
             // Set change amount from inAmountBn - outAmountBn
             changeAmount = inputAmount - outputAmount
@@ -303,43 +328,44 @@ public class TxBuilder {
         return transaction.sign(privateKey: privateKey, sighashType: sighashType, nIn: nIn, subScript: subScript, value: value, signatureVersion: signatureVersion)
     }
 
-    /// Sign the input with the private key. Only supports PayToPublicKeyHash inputs
+    /// Sign the input with the private key. Only supports PayToPublicKeyHash inputs.
+    ///
+    /// `throws` rather than `fatalError`s on bad inputs (missing prev-out,
+    /// unparseable scripts) so callers can surface the error in UI.
     @discardableResult
-    public func signInTx(nIn: Int, privateKey: PrivateKey, txOut: TransactionOutput? = nil, nScriptChunk: Int? = nil, sighashType: SighashType = SighashType.BSV.ALL, signatureVersion: SignatureVersion = .forkId) -> Self {
+    public func signInTx(nIn: Int, privateKey: PrivateKey, txOut: TransactionOutput? = nil, nScriptChunk: Int? = nil, sighashType: SighashType = SighashType.BSV.ALL, signatureVersion: SignatureVersion = .forkId) throws -> Self {
 
         var nScriptChunk = nScriptChunk
         let txIn = transaction.inputs[nIn]
-        let script = Script(data: txIn.signatureScript)!
+        guard let script = Script(data: txIn.signatureScript) else {
+            throw TxBuilderError.malformedSignatureScript(nIn: nIn)
+        }
 
         if nScriptChunk == nil && script.isPubKeyHashIn {
             nScriptChunk = 0
         }
 
-        guard let scriptChunk = nScriptChunk else {
-            // The branches above set nScriptChunk to 0 in every reachable
-            // path; reaching this guard means a future code change broke
-            // that invariant. Surface that explicitly so a stack trace
-            // points at the right spot instead of an empty fatalError.
-            fatalError("TxBuilder.signWithKeyPairs: nScriptChunk is nil — control flow above must always assign it")
-        }
+        // Default to chunk 0 if still unset. The previous fatalError here
+        // was a "this should never happen" guard; in practice only
+        // pubkey-hash inputs are supported by this method, so 0 is the
+        // correct chunk index for the standard flow.
+        let scriptChunk = nScriptChunk ?? 0
 
         let txHashBuf = txIn.previousOutput.hash
         let txOutNum = txIn.previousOutput.index
 
-        var txOut = txOut
-        if txOut == nil {
-            txOut = uTxOutMap.get(txHashBuf: txHashBuf, txOutNum: txOutNum)
+        let resolvedTxOut: TransactionOutput
+        if let provided = txOut {
+            resolvedTxOut = provided
+        } else if let mapped = uTxOutMap.get(txHashBuf: txHashBuf, txOutNum: txOutNum) {
+            resolvedTxOut = mapped
+        } else {
+            throw TxBuilderError.missingPrevOut(txid: txHashBuf.hex, vout: txOutNum)
         }
 
-        if txOut == nil {
-            // Caller passed neither a `txOut` nor populated `uTxOutMap`
-            // for this previous-output. Surfacing the txid:vout makes
-            // the misuse traceable instead of a bare fatalError.
-            fatalError("TxBuilder.signWithKeyPairs: missing prevOut for \(txHashBuf.hex):\(txOutNum) — pass txOut: or pre-populate uTxOutMap")
+        guard let subScript = Script(data: resolvedTxOut.lockingScript) else {
+            throw TxBuilderError.malformedLockingScript(nIn: nIn)
         }
-
-        let outputScript = txOut!.lockingScript
-        let subScript = Script(data: outputScript)!
 
         let sig = getSig(privateKey: privateKey, sighashType: sighashType, nIn: nIn, subScript: subScript, signatureVersion: signatureVersion)
 

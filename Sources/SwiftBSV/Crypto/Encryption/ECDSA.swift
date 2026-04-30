@@ -71,7 +71,11 @@ public final class ECDSA {
                     signature,
                     ptr.bindMemory(to: UInt8.self).baseAddress.unsafelyUnwrapped,
                     $0.bindMemory(to: UInt8.self).baseAddress.unsafelyUnwrapped,
-                    nil,
+                    // Explicit RFC-6979 deterministic nonce. libsecp256k1's
+                    // current default also resolves to RFC-6979, but naming
+                    // it here pins the contract — a future libsecp default
+                    // change can't silently break determinism downstream.
+                    secp256k1_nonce_function_rfc6979,
                     nil
                 )
             }
@@ -101,19 +105,40 @@ public final class ECDSA {
 
     static public func verifySignature(_ sigData: Data, message: Data, publicKeyData: Data) throws -> Bool {
         guard let ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_VERIFY)) else { return false }
+        // `defer` ensures the context is freed on every exit path; the
+        // previous code only destroyed it on success, leaking the context
+        // (and the precomputed elliptic-curve tables it owns) on every
+        // verification failure — measurable memory churn in scripts that
+        // call OP_CHECKSIG repeatedly with bad data.
+        defer { secp256k1_context_destroy(ctx) }
+
         var pubkey = secp256k1_pubkey()
         var signature = secp256k1_ecdsa_signature()
-        secp256k1_ecdsa_signature_parse_der(ctx, &signature, [UInt8](sigData), sigData.count)
 
-        if (secp256k1_ec_pubkey_parse(ctx, &pubkey, [UInt8](publicKeyData), publicKeyData.count) != 1) {
+        // Check the parse return value. Previously this was discarded, so
+        // a malformed DER signature would silently leave `signature`
+        // zero-initialised and verification would fail "for the right
+        // reason" only by accident.
+        guard secp256k1_ecdsa_signature_parse_der(ctx, &signature, [UInt8](sigData), sigData.count) == 1 else {
             return false
-        };
+        }
 
-        if (secp256k1_ecdsa_verify(ctx, &signature, [UInt8](message), &pubkey) != 1) {
+        // Reject high-S signatures (BIP-146 / SCRIPT_VERIFY_LOW_S).
+        // `secp256k1_ecdsa_signature_normalize` returns 1 if the signature
+        // had to be normalised — i.e. it was high-S. BSV consensus
+        // accepts only low-S, so a signature the network would reject must
+        // not validate locally either.
+        var normalized = secp256k1_ecdsa_signature()
+        let wasHighS = secp256k1_ecdsa_signature_normalize(ctx, &normalized, &signature)
+        if wasHighS == 1 {
             return false
-        };
-        secp256k1_context_destroy(ctx);
-        return true
+        }
+
+        guard secp256k1_ec_pubkey_parse(ctx, &pubkey, [UInt8](publicKeyData), publicKeyData.count) == 1 else {
+            return false
+        }
+
+        return secp256k1_ecdsa_verify(ctx, &signature, [UInt8](message), &pubkey) == 1
     }
 
     static public func verifySignatureCompact(_ sigData: Data, message: Data, publicKeyData: Data) throws -> Bool {

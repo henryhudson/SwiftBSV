@@ -53,6 +53,66 @@ public final class Bip39 {
         return mnemonic.joined(separator: " ")
     }
     
+    /// Validate a BIP-39 mnemonic. Returns `true` only when:
+    /// 1. Word count is one of 12 / 15 / 18 / 21 / 24
+    /// 2. Every word is in the supplied wordlist
+    /// 3. The trailing checksum bits match SHA-256(entropy).prefix(checksumBits)
+    ///
+    /// Without this check, a phrase with a single mistyped (but valid)
+    /// word silently produces a different-but-plausible seed — losing
+    /// access to funds with no error surface. Always validate before
+    /// `createSeed(mnemonic:)`.
+    public static func validate(mnemonic: String, language: WordList = .english) -> Bool {
+        let words = mnemonic
+            .decomposedStringWithCompatibilityMapping
+            .split(separator: " ")
+            .map(String.init)
+
+        // Allowed word counts per BIP-39: 12, 15, 18, 21, 24
+        guard [12, 15, 18, 21, 24].contains(words.count) else { return false }
+
+        let wordlist = language.words
+        // Build a single dictionary lookup so word validation stays linear
+        // in mnemonic length (rather than O(words × wordlist)).
+        let wordIndex: [String: Int] = {
+            var dict = [String: Int]()
+            dict.reserveCapacity(wordlist.count)
+            for (i, w) in wordlist.enumerated() { dict[String(w)] = i }
+            return dict
+        }()
+
+        var bits = ""
+        for word in words {
+            guard let idx = wordIndex[word] else { return false }
+            // 11 bits per word, big-endian.
+            bits += String(repeating: "0", count: 11 - String(idx, radix: 2).count) + String(idx, radix: 2)
+        }
+
+        let totalBits = words.count * 11
+        let checksumBits = totalBits / 33
+        let entropyBits = totalBits - checksumBits
+
+        let entropyBitsString = String(bits.prefix(entropyBits))
+        let checksumString = String(bits.suffix(checksumBits))
+
+        // Pack entropy bits into bytes.
+        var entropyBytes = [UInt8]()
+        var i = entropyBitsString.startIndex
+        while i < entropyBitsString.endIndex {
+            let byteEnd = entropyBitsString.index(i, offsetBy: 8, limitedBy: entropyBitsString.endIndex) ?? entropyBitsString.endIndex
+            let byteString = String(entropyBitsString[i..<byteEnd])
+            guard let byte = UInt8(byteString, radix: 2) else { return false }
+            entropyBytes.append(byte)
+            i = byteEnd
+        }
+
+        let hashBits = String(Data(entropyBytes).sha256()
+            .flatMap { ("00000000" + String($0, radix: 2)).suffix(8) })
+        let expectedChecksum = String(hashBits.prefix(checksumBits))
+
+        return checksumString == expectedChecksum
+    }
+
     public static func createSeed(mnemonic: String, withPassphrase passphrase: String = "") -> Data {
         let password = mnemonic.decomposedStringWithCompatibilityMapping
 

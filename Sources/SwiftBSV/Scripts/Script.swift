@@ -413,20 +413,26 @@ public class Script {
         return self
     }
 
+    /// Sub-script from `index` to end. Preserves opcode/data chunk
+    /// distinction by re-parsing the concatenated raw bytes — calling
+    /// `appendData(chunk.chunkData)` on every chunk (the previous
+    /// implementation) wrapped each chunk's wire bytes in a fresh
+    /// `<len> <bytes>` push, so an opcode-bearing chunk would be
+    /// re-emitted as a data push and lose its execution semantics.
     public func subScript(from index: Int) throws -> Script {
-        let subScript: Script = Script()
-        for chunk in chunks[index..<chunks.count] {
-            try subScript.appendData(chunk.chunkData)
+        let bytes = chunks[index..<chunks.count].reduce(Data()) { $0 + $1.chunkData }
+        guard let result = Script(data: bytes) else {
+            throw ScriptError.error("subScript(from:): re-parse of slice failed")
         }
-        return subScript
+        return result
     }
 
     public func subScript(to index: Int) throws -> Script {
-        let subScript: Script = Script()
-        for chunk in chunks[0..<index] {
-            try subScript.appendData(chunk.chunkData)
+        let bytes = chunks[0..<index].reduce(Data()) { $0 + $1.chunkData }
+        guard let result = Script(data: bytes) else {
+            throw ScriptError.error("subScript(to:): re-parse of slice failed")
         }
-        return subScript
+        return result
     }
 
     // MARK: - Utility methods

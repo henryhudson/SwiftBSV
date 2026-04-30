@@ -91,7 +91,12 @@ public enum BEEFParser {
         var transactions: [BEEFTransaction] = []
         for _ in 0..<nTxs {
             let txStart = offset
-            skipRawTransaction(data: data, offset: &offset)
+            // Propagate truncation as ParseError instead of silently leaving
+            // `offset` partway through a malformed transaction. Previously
+            // a truncated tx left `rawTx` as a half-parsed byte slice that
+            // looked structurally valid but was broken downstream — exactly
+            // the kind of error you want loud at parse time.
+            try skipRawTransaction(data: data, offset: &offset)
             let rawTx = Data(data[txStart..<offset])
 
             guard offset < data.count else { throw ParseError.unexpectedEnd }
@@ -180,28 +185,31 @@ public enum BEEFParser {
         return BUMP(blockHeight: blockHeight, treeHeight: treeHeight, levels: levels)
     }
 
-    private static func skipRawTransaction(data: Data, offset: inout Int) {
-        guard offset + 4 <= data.count else { return }
+    private static func skipRawTransaction(data: Data, offset: inout Int) throws {
+        // Propagate truncation as `ParseError.unexpectedEnd` so the caller
+        // knows the BEEF was malformed. Previously every guard `return`'d
+        // and the caller continued parsing as if everything was fine.
+        guard offset + 4 <= data.count else { throw ParseError.unexpectedEnd }
         offset += 4 // version
-        guard let inputCount = try? BUMPParser.readVarInt(data: data, offset: &offset) else { return }
+        let inputCount = try BUMPParser.readVarInt(data: data, offset: &offset)
         for _ in 0..<inputCount {
-            guard offset + 36 <= data.count else { return }
+            guard offset + 36 <= data.count else { throw ParseError.unexpectedEnd }
             offset += 32 // prev txid
             offset += 4  // prev index
-            guard let scriptLen = try? BUMPParser.readVarInt(data: data, offset: &offset),
-                  offset + Int(scriptLen) + 4 <= data.count else { return }
+            let scriptLen = try BUMPParser.readVarInt(data: data, offset: &offset)
+            guard offset + Int(scriptLen) + 4 <= data.count else { throw ParseError.unexpectedEnd }
             offset += Int(scriptLen)
             offset += 4  // sequence
         }
-        guard let outputCount = try? BUMPParser.readVarInt(data: data, offset: &offset) else { return }
+        let outputCount = try BUMPParser.readVarInt(data: data, offset: &offset)
         for _ in 0..<outputCount {
-            guard offset + 8 <= data.count else { return }
+            guard offset + 8 <= data.count else { throw ParseError.unexpectedEnd }
             offset += 8  // satoshis
-            guard let scriptLen = try? BUMPParser.readVarInt(data: data, offset: &offset),
-                  offset + Int(scriptLen) <= data.count else { return }
+            let scriptLen = try BUMPParser.readVarInt(data: data, offset: &offset)
+            guard offset + Int(scriptLen) <= data.count else { throw ParseError.unexpectedEnd }
             offset += Int(scriptLen)
         }
-        guard offset + 4 <= data.count else { return }
+        guard offset + 4 <= data.count else { throw ParseError.unexpectedEnd }
         offset += 4 // locktime
     }
 }

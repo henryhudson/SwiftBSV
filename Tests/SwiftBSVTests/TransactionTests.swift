@@ -52,6 +52,85 @@ class TransactionTests: XCTestCase {
         XCTAssertEqual(hash.hex, "b0dc030661783dd9939e4bf1a6dfcba809da2017e1b315a6312e5942d714cf05")
     }
 
+    /// Round-trip regression: a signature produced by `Transaction.sign`
+    /// must verify against `Crypto.verifySigData` for the same digest.
+    /// Previously these two paths operated on byte-reversed twins of the
+    /// same hash, so the network accepted broadcast txs but the local
+    /// script machine rejected them at OP_CHECKSIG.
+    func testSignVerifyRoundTrip() {
+        let alice = PrivateKey(network: .mainnet)
+        let bob = PrivateKey(network: .mainnet)
+        let prevTxid = Data(repeating: 0xab, count: 32)
+        let utxo = TransactionOutput(
+            value: 100_000,
+            lockingScript: alice.publicKey.address.toTxOutputScript().data
+        )
+
+        var tx = Transaction(
+            version: 1,
+            inputs: [TransactionInput(
+                previousOutput: TransactionOutPoint(hash: prevTxid, index: 0),
+                signatureScript: utxo.lockingScript,
+                sequence: 0xffffffff
+            )],
+            outputs: [TransactionOutput(
+                value: 50_000,
+                lockingScript: bob.publicKey.address.toTxOutputScript().data
+            )],
+            lockTime: 0
+        )
+
+        let sighashType = SighashType.BSV.ALL
+        let subScript = Script(data: utxo.lockingScript)!
+        let sig = tx.sign(
+            privateKey: alice,
+            sighashType: sighashType,
+            nIn: 0,
+            subScript: subScript,
+            value: utxo.value
+        )
+
+        // Wire-format signature = DER || sighash byte
+        let sigData = sig + Data([UInt8(sighashType.sighash)])
+
+        let verified = try? Crypto.verifySigData(
+            for: tx,
+            inputIndex: 0,
+            utxo: utxo,
+            sigData: sigData,
+            pubKeyData: alice.publicKey.toDer()
+        )
+
+        XCTAssertEqual(verified, true)
+    }
+
+    /// BIP-69: inputs sorted by (txid display-order, vout), outputs by
+    /// (value, locking script).
+    func testBip69Sort() {
+        let txidA = Data(repeating: 0x10, count: 32) // smaller display txid
+        let txidB = Data(repeating: 0x20, count: 32)
+        let inA = TransactionInput(
+            previousOutput: TransactionOutPoint(hash: txidA, index: 5),
+            signatureScript: Data(),
+            sequence: 0xffffffff
+        )
+        let inB = TransactionInput(
+            previousOutput: TransactionOutPoint(hash: txidB, index: 0),
+            signatureScript: Data(),
+            sequence: 0xffffffff
+        )
+        let outLow = TransactionOutput(value: 100, lockingScript: Data([0x51]))
+        let outHigh = TransactionOutput(value: 1_000, lockingScript: Data([0x52]))
+
+        var tx = Transaction(version: 1, inputs: [inB, inA], outputs: [outHigh, outLow], lockTime: 0)
+        tx.sort()
+
+        XCTAssertEqual(tx.inputs[0].previousOutput.hash, txidA)
+        XCTAssertEqual(tx.inputs[1].previousOutput.hash, txidB)
+        XCTAssertEqual(tx.outputs[0].value, 100)
+        XCTAssertEqual(tx.outputs[1].value, 1_000)
+    }
+
     func testSighashVectors() {
 
         // --- Tx Sighash

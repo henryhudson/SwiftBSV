@@ -58,6 +58,15 @@ public struct BUMP {
     }
 
     /// Convert to a MerkleProof for use with SPV verification.
+    ///
+    /// Returns nil on:
+    /// - `txid` is not present in level 0
+    /// - tree is empty
+    /// - any level on the path lacks a sibling for the current offset
+    ///   (previously this silently produced a truncated proof; the
+    ///   verifier would then return `false` "for the right reason" only
+    ///   by accident, masking the malformed-input cause)
+    /// - `foundLeaf.offset >= 2^treeHeight` (path would walk off the tree)
     public func toMerkleProof(txid: String, merkleRoot: String, blockHash: String) -> MerkleProof? {
         let txidBytes = Data(Data(hex: txid).reversed())
         guard let level0 = levels.first else { return nil }
@@ -71,10 +80,15 @@ public struct BUMP {
         }
         guard let foundLeaf = txLeaf else { return nil }
 
+        // Bound check: the leaf offset must fit inside the declared tree.
+        if treeHeight < 63, foundLeaf.offset >= (UInt64(1) << UInt64(treeHeight)) {
+            return nil
+        }
+
         let index = Int(foundLeaf.offset)
 
         // Collect sibling hashes from each level, tracking the running hash
-        // so duplicate leaves can be resolved correctly (BRC-74 section 3.4)
+        // so duplicate leaves can be resolved correctly (BRC-74 section 3.4).
         var nodes: [String] = []
         var currentOffset = foundLeaf.offset
         var currentHash = txid
@@ -91,7 +105,11 @@ public struct BUMP {
                 }
                 break
             }
-            if !foundSibling { break }
+            // Reject a truncated path. Returning a partial proof would
+            // produce a "false" from the verifier, but the failure mode
+            // would be indistinguishable from a forged proof — the
+            // structural break belongs at the source.
+            guard foundSibling else { return nil }
 
             let siblingHex = nodes.last!
             let isLeft = (currentOffset % 2 == 0)

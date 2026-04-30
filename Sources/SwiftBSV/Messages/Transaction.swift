@@ -153,12 +153,32 @@ extension Transaction {
         self.lockTime = nLockTime
     }
 
-    /// BIP 69 sorting. Be sure to sign after sorting.
-    mutating func sort() {
-        // TODO
-//        inputs.sort(by: { first, second in
-//            return first.previousOutput.hash.reversed() > second.previousOutput.hash.reversed()
-//        })
+    /// BIP-69 deterministic sorting of inputs and outputs. Must be called
+    /// before signing — the digest covers the (sorted) input/output array.
+    ///
+    /// Inputs sorted ascending by (prev txid in big-endian display order,
+    /// then prev vout). Outputs sorted ascending by (value, then locking
+    /// script bytes lexicographically).
+    ///
+    /// White paper §10 (Privacy): canonical ordering removes "this is the
+    /// X wallet" fingerprinting from the wire format.
+    public mutating func sort() {
+        inputs.sort { lhs, rhs in
+            // Compare txids in big-endian (display) order — that's the
+            // BIP-69 contract and matches what users see in explorers.
+            let lTxid = Data(lhs.previousOutput.hash.reversed())
+            let rTxid = Data(rhs.previousOutput.hash.reversed())
+            if lTxid != rTxid {
+                return lexicographicallyLessThan(lTxid, rTxid)
+            }
+            return lhs.previousOutput.index < rhs.previousOutput.index
+        }
+        outputs.sort { lhs, rhs in
+            if lhs.value != rhs.value {
+                return lhs.value < rhs.value
+            }
+            return lexicographicallyLessThan(lhs.lockingScript, rhs.lockingScript)
+        }
     }
 
     mutating func fillSig(nIn: Int, nScriptChunk: Int, sig: Data, sighashType: SighashType, publicKey: PublicKey) {
@@ -194,6 +214,20 @@ extension Transaction {
         return sig
     }
 
+}
+
+/// Big-endian byte-by-byte less-than. Two equal-prefix arrays use length
+/// as tiebreaker (shorter is "less"), matching BIP-69's reference behaviour.
+private func lexicographicallyLessThan(_ lhs: Data, _ rhs: Data) -> Bool {
+    let count = min(lhs.count, rhs.count)
+    let lStart = lhs.startIndex
+    let rStart = rhs.startIndex
+    for i in 0..<count {
+        let l = lhs[lStart + i]
+        let r = rhs[rStart + i]
+        if l != r { return l < r }
+    }
+    return lhs.count < rhs.count
 }
 
 struct TransactionSigHashFlags: OptionSet {

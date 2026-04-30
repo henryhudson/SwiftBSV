@@ -37,7 +37,11 @@ public enum Network: Sendable {
     }
 
     public var txBuilder: TxBuilder {
-        return TxBuilder(dust: 546, feePerKb: 0.00000500e8)
+        // 500 satoshis per kilobyte. Previously stored as Float
+        // (`0.00000500e8`) which made fee math non-deterministic across
+        // architectures and caused occasional "fee too low" rejections at
+        // the 0.5-sat boundary. Now `UInt64` sat/kb directly.
+        return TxBuilder(dust: 546, feePerKb: 500)
     }
 
     public struct Bip32 {
@@ -50,7 +54,9 @@ public enum Network: Sendable {
 
     public struct TxBuilder {
         let dust: UInt64
-        let feePerKb: Float
+        /// Sat per kilobyte. Integer for deterministic, cross-platform
+        /// fee math (Float was a footgun).
+        let feePerKb: UInt64
     }
 
 

@@ -267,4 +267,37 @@ class Bip39Tests: XCTestCase {
             "f7f8c90b881e92fb3646e67a076006fa78c21320eeae3e034993468289eb7919f89140b0333e814d397fb0e42232cdb2dc3420016f4b5ed21dc5251630da8bf4"
         )
     }
+
+    // MARK: - validate(mnemonic:)
+
+    func testValidateAcceptsRoundTripMnemonic() {
+        // Anything `create` produces must round-trip through `validate`.
+        for _ in 0..<5 {
+            let mnemonic = Bip39.create()
+            XCTAssertTrue(Bip39.validate(mnemonic: mnemonic),
+                          "freshly-generated mnemonic failed validation: \(mnemonic)")
+        }
+    }
+
+    func testValidateRejectsBadChecksum() {
+        // BIP-39 standard test vector — 12 words, all "abandon" + "about".
+        let valid = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+        XCTAssertTrue(Bip39.validate(mnemonic: valid))
+
+        // Replace the last word with another valid wordlist entry that
+        // violates the checksum. "above" is wordlist index 3, "about" is 2.
+        let bad = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon above"
+        XCTAssertFalse(Bip39.validate(mnemonic: bad))
+    }
+
+    func testValidateRejectsUnknownWord() {
+        let bad = "notaword abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+        XCTAssertFalse(Bip39.validate(mnemonic: bad))
+    }
+
+    func testValidateRejectsBadWordCount() {
+        // 11 words — not in {12, 15, 18, 21, 24}
+        let short = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
+        XCTAssertFalse(Bip39.validate(mnemonic: short))
+    }
 }

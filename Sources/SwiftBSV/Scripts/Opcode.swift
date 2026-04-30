@@ -93,8 +93,8 @@ public enum OpCode: OpCodeProtocol {
         case .OP_CAT: return OpConcatenate()
         case .OP_SIZE: return OpSize()
         case .OP_SPLIT: return OpSplit()
-        case .OP_NUM2BIN: return OpExample()
-        case .OP_BIN2NUM: return OpExample()
+        case .OP_NUM2BIN: return OpNum2Bin()
+        case .OP_BIN2NUM: return OpBin2Num()
 
         // 5. Bitwise logic
         case .OP_INVERT: return OpInvert()

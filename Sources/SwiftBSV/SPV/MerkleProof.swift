@@ -161,7 +161,28 @@ public struct MerkleVerifier {
     public init() {}
 
     /// Verify a standard Merkle proof against a known Merkle root.
+    ///
+    /// Structural rejections (in addition to the root check):
+    /// - `txid` is empty or not 32 bytes hex (would silently match against a
+    ///   trivial empty hash root)
+    /// - `index` is negative
+    /// - `index >= 2^proof.nodes.count` (proof is too short for this index;
+    ///   path traversal would terminate early and pretend success)
+    /// - any node hash is empty (encoding error masquerading as a valid
+    ///   proof of inclusion)
     public func verifyMerkleProof(_ proof: MerkleProof, expectedMerkleRoot: String) -> Bool {
+        guard !proof.txid.isEmpty, Data(hex: proof.txid).count == 32 else { return false }
+        guard proof.index >= 0 else { return false }
+        // Use Double for the 2^n check to avoid Int overflow on adversarial
+        // depths; a real proof tops out at depth ~30, this is pure paranoia.
+        if proof.nodes.count < 63,
+           proof.index >= (1 << proof.nodes.count) {
+            return false
+        }
+        guard proof.nodes.allSatisfy({ !$0.isEmpty && Data(hex: $0).count == 32 }) else {
+            return false
+        }
+
         var currentHash = proof.txid
         var index = proof.index
 

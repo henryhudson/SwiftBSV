@@ -108,7 +108,7 @@ public struct ScriptMachine {
     }
 
     public static func run(_ script: Script, context: ScriptExecutionContext) throws {
-        guard script.data.count <= BTC_MAX_SCRIPT_SIZE else {
+        guard script.data.count <= context.policy.maxScriptSize else {
             throw ScriptMachineError.exception("Script binary is too long.")
         }
 

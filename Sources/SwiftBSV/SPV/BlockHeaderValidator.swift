@@ -150,7 +150,32 @@ public struct BlockHeaderValidator: Sendable {
 
     // MARK: - Target Calculation
 
+    /// Bitcoin/BSV `powLimit` for mainnet — the highest target the protocol
+    /// will ever accept. A header whose decoded target exceeds this is
+    /// invalid by consensus regardless of self-consistency. Equals
+    /// 0x00000000ffff0000…0000 (the genesis difficulty).
+    public static let mainnetPowLimit: UInt256 = {
+        // 0x1d00ffff in compact bits — the genesis target.
+        var bytes = [UInt8](repeating: 0, count: 32)
+        bytes[2] = 0x00
+        bytes[3] = 0xff
+        bytes[4] = 0xff
+        return UInt256(data: Data(bytes))
+    }()
+
     /// Convert compact bits representation to target value.
+    ///
+    /// Rejects, in addition to malformed input:
+    /// - **Negative targets** (sign bit `0x00800000` set in the coefficient).
+    ///   Bitcoin's compact encoding interprets the high bit of the
+    ///   coefficient as a sign; a "negative" target is non-sensical and
+    ///   rejected by every reference implementation.
+    /// - **Zero coefficient** (target = 0; would be unsatisfiable).
+    /// - **Targets above `mainnetPowLimit`** (header claims an easier-than-
+    ///   genesis difficulty — a peer feeding low-PoW headers would otherwise
+    ///   self-consistency-validate).
+    /// - **Exponent < 3**: encoding ambiguity zone.
+    /// - **Exponent > 32**: would shift past 256 bits.
     public func targetFromBits(bits: String) -> UInt256? {
         let bitsData = Data(hex: bits)
         guard bitsData.count == 4 else { return nil }
@@ -159,9 +184,21 @@ public struct BlockHeaderValidator: Sendable {
         let exponent = Int(bytes[3])
         let coefficient = UInt32(bytes[0]) | (UInt32(bytes[1]) << 8) | (UInt32(bytes[2]) << 16)
 
-        guard exponent >= 3 else { return nil }
+        // Sign bit set on coefficient → "negative" target → reject.
+        guard (coefficient & 0x00800000) == 0 else { return nil }
+        // Zero coefficient → unsatisfiable target.
+        guard coefficient != 0 else { return nil }
 
-        return UInt256(coefficient) << ((exponent - 3) * 8)
+        guard exponent >= 3, exponent <= 32 else { return nil }
+
+        let target = UInt256(coefficient) << ((exponent - 3) * 8)
+
+        // Reject targets above the protocol PoW limit. Without this a peer
+        // could feed a chain of headers with arbitrarily easy `bits`
+        // fields and every header would self-consistency-validate.
+        guard target <= BlockHeaderValidator.mainnetPowLimit else { return nil }
+
+        return target
     }
 }
 

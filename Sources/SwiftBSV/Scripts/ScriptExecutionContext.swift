@@ -51,6 +51,11 @@ public class ScriptExecutionContext {
     // This is used to test for P2SH scripts or other changes in the protocol that may happen in the future.
     public var blockTimeStamp: UInt32 = UInt32(Date().timeIntervalSince1970)
 
+    /// Per-execution policy (script size / op count / element size caps,
+    /// P2SH verification). Defaults to `ScriptPolicy.default` (BSV
+    /// post-Genesis). Override to `.legacy` for pre-Genesis test vectors.
+    public var policy: ScriptPolicy = .default
+
     // Constants
     private let blobFalse: Data = Data()
     private let blobZero: Data = Data()
@@ -76,7 +81,11 @@ public class ScriptExecutionContext {
     }
 
     public func shouldVerifyP2SH() -> Bool {
-        return blockTimeStamp >= BTC_BIP16_TIMESTAMP
+        // Two gates: the BIP16 activation timestamp (historical), and the
+        // per-context policy. BSV post-Genesis sets `policy.verifyP2SH = false`
+        // by default — P2SH outputs are non-standard there. Pass
+        // `.legacy` policy to opt in for replaying pre-Genesis transactions.
+        return policy.verifyP2SH && blockTimeStamp >= BTC_BIP16_TIMESTAMP
     }
 
     private func normalized(_ index: Int) -> Int {
@@ -92,7 +101,7 @@ public class ScriptExecutionContext {
         stack.append(num)
     }
     public func pushToStack(_ data: Data) throws {
-        guard data.count <= BTC_MAX_SCRIPT_ELEMENT_SIZE else {
+        guard data.count <= policy.maxElementSize else {
             throw ScriptMachineError.error("PushedData size is too big.")
         }
         stack.append(data)
@@ -121,7 +130,7 @@ public class ScriptExecutionContext {
     // OpCount
     public func incrementOpCount(by i: Int = 1) throws {
         opCount += i
-        guard opCount <= BTC_MAX_OPS_PER_SCRIPT else {
+        guard opCount <= policy.maxOpsPerScript else {
             throw OpCodeExecutionError.error("Exceeded the allowed number of operations per script.")
         }
     }
