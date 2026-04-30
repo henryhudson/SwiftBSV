@@ -136,8 +136,6 @@ public class ScriptExecutionContext {
     }
 
     public func deserializeP2SHLockScript(stackForP2SH: [Data]) throws -> Script {
-        var stackForP2SH: [Data] = stackForP2SH
-
         // Instantiate the script from the last data on the stack.
         guard let last = stackForP2SH.last, let deserializedLockScript = Script(data: last) else {
             // stackForP2SH cannot be empty here, because if it was the
@@ -146,12 +144,12 @@ public class ScriptExecutionContext {
             throw ScriptMachineError.exception("internal inconsistency: stackForP2SH cannot be empty at this point.")
         }
 
-        // Remove it from the stack.
-        stackForP2SH.removeLast()
-
-        // Replace current stack with P2SH stack.
+        // Replace current stack with P2SH stack minus the consumed redeem
+        // script. `dropLast()` says the same thing as `var copy = …;
+        // copy.removeLast()` in one expression and avoids the parameter
+        // shadowing.
         resetStack()
-        stack = stackForP2SH
+        stack = Array(stackForP2SH.dropLast())
         return deserializedLockScript
     }
 

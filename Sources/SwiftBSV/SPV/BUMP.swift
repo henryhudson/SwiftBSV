@@ -89,29 +89,38 @@ public struct BUMP {
 
         // Collect sibling hashes from each level, tracking the running hash
         // so duplicate leaves can be resolved correctly (BRC-74 section 3.4).
+        //
+        // Replaced the original `var foundSibling = false; for { … break }`
+        // pattern with `first(where:)` — the predicate now reads as the
+        // sibling-lookup question it actually is, and the malformed-leaf
+        // case (matched offset, but neither `duplicate` nor a usable hash)
+        // is an explicit `return nil` rather than a quietly-unset flag.
         var nodes: [String] = []
         var currentOffset = foundLeaf.offset
         var currentHash = txid
         for level in levels {
             let siblingOffset = currentOffset ^ 1
-            var foundSibling = false
-            for leaf in level.leaves where leaf.offset == siblingOffset {
-                if leaf.duplicate {
-                    nodes.append(currentHash)
-                    foundSibling = true
-                } else if let hash = leaf.hash {
-                    nodes.append(Data(hash.reversed()).hex)
-                    foundSibling = true
-                }
-                break
+            guard let sibling = level.leaves.first(where: { $0.offset == siblingOffset }) else {
+                // Reject a truncated path. Returning a partial proof would
+                // produce a "false" from the verifier, but the failure mode
+                // would be indistinguishable from a forged proof — the
+                // structural break belongs at the source.
+                return nil
             }
-            // Reject a truncated path. Returning a partial proof would
-            // produce a "false" from the verifier, but the failure mode
-            // would be indistinguishable from a forged proof — the
-            // structural break belongs at the source.
-            guard foundSibling else { return nil }
 
-            let siblingHex = nodes.last!
+            let siblingHex: String
+            if sibling.duplicate {
+                siblingHex = currentHash
+            } else if let hash = sibling.hash {
+                siblingHex = Data(hash.reversed()).hex
+            } else {
+                // Sibling slot exists but carries neither a duplicate flag
+                // nor a hash — malformed BUMP, reject for the same reason
+                // a missing sibling does.
+                return nil
+            }
+            nodes.append(siblingHex)
+
             let isLeft = (currentOffset % 2 == 0)
             if isLeft {
                 currentHash = BUMP.hashPair(left: currentHash, right: siblingHex)
