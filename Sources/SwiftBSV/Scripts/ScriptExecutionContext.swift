@@ -172,19 +172,15 @@ public class ScriptExecutionContext {
     }
 
     public func bool(at i: Int) -> Bool {
-        let data: Data = stack[normalized(i)]
-        guard !data.isEmpty else {
-            return false
+        // Bitcoin Script truthiness: any non-zero byte counts as true,
+        // EXCEPT a trailing 0x80 (negative zero — sign bit only). The
+        // `.contains { ... }` form expresses that invariant directly,
+        // replacing a for-loop-with-where-and-early-returns that read
+        // as a riddle.
+        let data = stack[normalized(i)]
+        return data.enumerated().contains { offset, byte in
+            byte != 0 && !(offset == data.count - 1 && byte == 0x80)
         }
-
-        for (i, byte) in data.enumerated() where byte != 0 {
-            // Can be negative zero, also counts as false
-            if i == (data.count - 1) && byte == 0x80 {
-                return false
-            }
-            return true
-        }
-        return false
     }
 }
 

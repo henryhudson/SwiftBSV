@@ -37,7 +37,13 @@ public class TxBuilder {
     private var sigOperations = SigOperations()
 
     private(set) var changeScript: Script?
-    private(set) var changeAmount: UInt64?
+    /// Spendable change amount left over after fees. `0` means no change
+    /// (either by construction or because the change-output value fell
+    /// below `dust` and `dustChangeToFees` rolled it into the fee).
+    /// Previously `UInt64?` with `nil` indistinguishable from `0`; the
+    /// `build()` flow always set it to `0` before reading, so the Optional
+    /// was decorative — every read site force-unwrapped.
+    private(set) var changeAmount: UInt64 = 0
 
     private(set) var feeAmount: UInt64 = 0
     private(set) var dustChangeToFees = true
@@ -144,24 +150,24 @@ public class TxBuilder {
         return self
     }
 
-    /// Add the outputs to the transaction and return the total amount
+    /// Add the outputs to the transaction and return the total amount.
+    /// Side-effect (appending to `transaction`) is intentional and shared
+    /// with the caller; pure sum is folded in via `reduce(into:)`.
     func buildOutputs() -> UInt64 {
-        var totalOutputValue = UInt64()
-
-        for txOut in transactionOutputs {
-            // TODO: check if output amount is less than dust, and the output is an opreturn.
-            //if (txOut.value < dust && !txOut.script.isOpReturn && !txOut.script.isSafeDataOut) {
-            //  throw error!
-            //
-            totalOutputValue += txOut.value
+        // TODO: reject outputs below dust unless they are OP_RETURN /
+        // safe-data-out (consensus-relayed null-data scripts).
+        transactionOutputs.reduce(into: UInt64(0)) { total, txOut in
+            total += txOut.value
             transaction.addTransactionOutput(txOut)
         }
-
-        return totalOutputValue
     }
 
+    /// Iterate transactionInputs, accumulating prev-out values until
+    /// `outAmount` is met (plus any requested extra). Genuinely sequential
+    /// because of the early-exit, so a `for` loop is the right shape;
+    /// only the accumulator type was tightened to `UInt64`.
     func buildInputs(outAmount: UInt64, extraInputsNum: UInt32 = 0) throws -> UInt64 {
-        var totalInputAmount = UInt64()
+        var totalInputAmount: UInt64 = 0
         var extraInputsNum = extraInputsNum
 
         for txIn in transactionInputs {
@@ -236,7 +242,7 @@ public class TxBuilder {
 
     @discardableResult
     public func build(useAllInputs: Bool) throws -> TxBuilder {
-        var minFeeAmount = UInt64()
+        var minFeeAmount: UInt64 = 0
         self.changeAmount = 0
 
         if transactionInputs.count <= 0 {
@@ -254,7 +260,7 @@ public class TxBuilder {
             let outputAmount = buildOutputs()
 
             // Add temporary change output transaction.
-            let changeTxOut = TransactionOutput(value: changeAmount!, lockingScript: changeScript.data)
+            let changeTxOut = TransactionOutput(value: changeAmount, lockingScript: changeScript.data)
             transaction.addTransactionOutput(changeTxOut)
 
             let inputAmount = try buildInputs(outAmount: outputAmount, extraInputsNum: extraInputsNum)
@@ -263,7 +269,7 @@ public class TxBuilder {
             changeAmount = inputAmount - outputAmount
 
             minFeeAmount = estimateFee()
-            if changeAmount! >= minFeeAmount && (changeAmount! - minFeeAmount) > dust {
+            if changeAmount >= minFeeAmount && (changeAmount - minFeeAmount) > dust {
                 break
             }
 
@@ -272,24 +278,24 @@ public class TxBuilder {
 
 
         // Calculate fee and change
-        if changeAmount! >= minFeeAmount {
+        if changeAmount >= minFeeAmount {
 
             // Subtract fee from change
             feeAmount = minFeeAmount
-            changeAmount = changeAmount! - feeAmount
+            changeAmount = changeAmount - feeAmount
 
             // Recreate the change transaction output with the correct fee
             _ = transaction.removeLastTransactionOutput()
-            let changeTxOut = TransactionOutput(value: changeAmount!, lockingScript: changeScript.data)
+            let changeTxOut = TransactionOutput(value: changeAmount, lockingScript: changeScript.data)
             transaction.addTransactionOutput(changeTxOut)
 
             // Check change amount is valid
-            if changeAmount! < dust {
+            if changeAmount < dust {
                 if dustChangeToFees {
                     // Remove the change output since it is less that dust and the
                     // builder has requested that dust be sent to fees
                     _ = transaction.removeLastTransactionOutput()
-                    feeAmount += changeAmount!
+                    feeAmount += changeAmount
                     changeAmount = 0
                 } else {
                     throw TxBuilderError.changeOutputLessThanDust

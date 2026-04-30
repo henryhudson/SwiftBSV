@@ -38,19 +38,21 @@ public final class Bip39 {
         let entropybits = String(entropy.flatMap { ("00000000" + String($0, radix: 2)).suffix(8) })
         let hashBits = String(entropy.sha256().flatMap { ("00000000" + String($0, radix: 2)).suffix(8) })
         let checkSum = String(hashBits.prefix((entropy.count * 8) / 32))
-        
+
         let words = language.words
         let concatenatedBits = entropybits + checkSum
-        
-        var mnemonic: [String] = []
-        for index in 0..<(concatenatedBits.count / 11) {
-            let startIndex = concatenatedBits.index(concatenatedBits.startIndex, offsetBy: index * 11)
-            let endIndex = concatenatedBits.index(startIndex, offsetBy: 11)
-            let wordIndex = Int(strtoul(String(concatenatedBits[startIndex..<endIndex]), nil, 2))
-            mnemonic.append(String(words[wordIndex]))
-        }
-        
-        return mnemonic.joined(separator: " ")
+
+        // Walk the bit-string in 11-bit windows. `Int(_:radix:)` replaces
+        // `strtoul`-via-`String` (idiomatic, faster, no UTF-8 round-trip),
+        // and `stride/map` makes the transform `let`-only.
+        return stride(from: 0, to: concatenatedBits.count, by: 11)
+            .map { offset -> String in
+                let start = concatenatedBits.index(concatenatedBits.startIndex, offsetBy: offset)
+                let end = concatenatedBits.index(start, offsetBy: 11)
+                let wordIndex = Int(concatenatedBits[start..<end], radix: 2) ?? 0
+                return String(words[wordIndex])
+            }
+            .joined(separator: " ")
     }
     
     /// Validate a BIP-39 mnemonic. Returns `true` only when:

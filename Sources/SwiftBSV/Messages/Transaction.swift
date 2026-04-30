@@ -88,15 +88,11 @@ public struct Transaction: Equatable {
     static func deserialize(_ byteStream: ByteStream) -> Transaction {
         let version = byteStream.read(UInt32.self)
         let txInCount = byteStream.read(VarInt.self)
-        var inputs = [TransactionInput]()
-        for _ in 0..<Int(txInCount.underlyingValue) {
-            inputs.append(TransactionInput.deserialize(byteStream))
-        }
+        let inputs = (0..<Int(txInCount.underlyingValue))
+            .map { _ in TransactionInput.deserialize(byteStream) }
         let txOutCount = byteStream.read(VarInt.self)
-        var outputs = [TransactionOutput]()
-        for _ in 0..<Int(txOutCount.underlyingValue) {
-            outputs.append(TransactionOutput.deserialize(byteStream))
-        }
+        let outputs = (0..<Int(txOutCount.underlyingValue))
+            .map { _ in TransactionOutput.deserialize(byteStream) }
         let lockTime = byteStream.read(UInt32.self)
         return Transaction(version: version, inputs: inputs, outputs: outputs, lockTime: lockTime)
     }
@@ -181,22 +177,27 @@ extension Transaction {
         }
     }
 
+    /// Non-mutating BIP-69 sort. Pairs with `sort()` per the Swift stdlib
+    /// convention (`sort` mutates, `sorted` returns a new value), enabling
+    /// pipeline-style usage: `tx.sorted().signed(at: 0, with: key, …)`.
+    public func sorted() -> Transaction {
+        var copy = self
+        copy.sort()
+        return copy
+    }
+
     mutating func fillSig(nIn: Int, nScriptChunk: Int, sig: Data, sighashType: SighashType, publicKey: PublicKey) {
-        var inputs = self.inputs
-        let input = inputs[nIn]
         let sigWithType = sig + [UInt8(sighashType.sighash)]
         let unlockingScript = try! Script()
             .appendData(sigWithType)
             .appendData(publicKey.toDer())
 
-        let unlockedTransactionInput = TransactionInput(
-            previousOutput: input.previousOutput,
+        let original = inputs[nIn]
+        inputs[nIn] = TransactionInput(
+            previousOutput: original.previousOutput,
             signatureScript: unlockingScript.data,
-            sequence: input.sequence
+            sequence: original.sequence
         )
-
-        inputs[nIn] = unlockedTransactionInput
-        self.inputs = inputs
     }
 
 }

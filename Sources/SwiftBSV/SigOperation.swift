@@ -46,10 +46,14 @@ class SigOperations {
     }
 
     func addOne(txHashBuf: Data, txOutNum: UInt32, nScriptChunk: UInt32, type: SigOperation.OperationType = .sig, addressString: String, nHashType: SighashType = SighashType.BSV.ALL) {
-        var operations = get(txHashBuf: txHashBuf, txOutNum: txOutNum) ?? []
-        let sigOperation = SigOperation(nScriptChunk: nScriptChunk, type: type, addressString: addressString, nHashType: nHashType)
-        operations.append(sigOperation)
-        setMany(txHashBuf: txHashBuf, txOutNum: txOutNum, operations: operations)
+        // Single dictionary subscript with `default: []` collapses the
+        // get / mutate / set dance into the canonical Swift idiom — no
+        // intermediate state where another caller could observe a
+        // partially-built array.
+        let label = txHashBuf.hex + ":" + String(txOutNum)
+        map[label, default: []].append(
+            SigOperation(nScriptChunk: nScriptChunk, type: type, addressString: addressString, nHashType: nHashType)
+        )
     }
 
     /// Get the operations from the map
