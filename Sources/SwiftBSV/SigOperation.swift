@@ -21,7 +21,12 @@ public struct SigOperation {
     var nHashType: SighashType
 }
 
-class SigOperations {
+/// Value-type map of pending signature/pubkey insertions, keyed by
+/// `<txHashBuf.hex>:<txOutNum>`. See `TxOutMap` for the same rationale —
+/// no reference-semantics requirement here, so a `struct` is the right
+/// choice and is also a prerequisite for making `TxBuilder` a struct
+/// (a struct holding a class field has bizarre value semantics).
+struct SigOperations {
 
     private var map = [String: [SigOperation]]()
 
@@ -33,19 +38,19 @@ class SigOperations {
     ///   - type: the sig operation type (sig, or pubkey)
     ///   - addressString: The addressStr coresponding to this (txHashBuf, txOutNum, nScriptChunk) where we are going to sign and insert the signature or public key.
     ///   - nHashType: Usually = Sig.SIGHASH_ALL | Sig.SIGHASH_FORKID
-    func setOne(txHashBuf: Data, txOutNum: UInt32, nScriptChunk: UInt32, type: SigOperation.OperationType, addressString: String, nHashType: SighashType = SighashType.BSV.ALL) {
+    mutating func setOne(txHashBuf: Data, txOutNum: UInt32, nScriptChunk: UInt32, type: SigOperation.OperationType, addressString: String, nHashType: SighashType = SighashType.BSV.ALL) {
         let label = txHashBuf.hex + ":" + String(txOutNum)
         let sigOperation = SigOperation(nScriptChunk: nScriptChunk, type: type, addressString: addressString, nHashType: nHashType)
         map[label] = [sigOperation]
     }
 
     /// Set a bunch of addresses for signing an input such as for use with multi-sig.
-    func setMany(txHashBuf: Data, txOutNum: UInt32, operations: [SigOperation]) {
+    mutating func setMany(txHashBuf: Data, txOutNum: UInt32, operations: [SigOperation]) {
         let label = txHashBuf.hex + ":" + String(txOutNum)
         map[label] = operations
     }
 
-    func addOne(txHashBuf: Data, txOutNum: UInt32, nScriptChunk: UInt32, type: SigOperation.OperationType = .sig, addressString: String, nHashType: SighashType = SighashType.BSV.ALL) {
+    mutating func addOne(txHashBuf: Data, txOutNum: UInt32, nScriptChunk: UInt32, type: SigOperation.OperationType = .sig, addressString: String, nHashType: SighashType = SighashType.BSV.ALL) {
         // Single dictionary subscript with `default: []` collapses the
         // get / mutate / set dance into the canonical Swift idiom — no
         // intermediate state where another caller could observe a

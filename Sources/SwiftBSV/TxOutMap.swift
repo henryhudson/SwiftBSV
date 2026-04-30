@@ -18,12 +18,17 @@ import Foundation
  * TxOutMap is necessary when signing a transction to get the script and value
  * of that output which is plugged into the sighash algorithm.
  */
-class TxOutMap {
+/// Value-type map keyed by `<txHashBuf.hex>:<txOutNum>`. Was a `class`
+/// for no apparent reason — there is no shared identity, no inheritance,
+/// no need for reference semantics. Converting to `struct` propagates
+/// value semantics up to TxBuilder and removes a class of identity-vs-
+/// equality bugs across the whole signing path.
+struct TxOutMap {
 
     private var dictionary = [String: TransactionOutput]()
 
     /// Set the output index for the input transaction id + outpoint index
-    func set(txHashBuf: Data, txOutNum: UInt32, txOut: TransactionOutput) {
+    mutating func set(txHashBuf: Data, txOutNum: UInt32, txOut: TransactionOutput) {
         let label = txHashBuf.hex + ":" + String(txOutNum)
         dictionary[label] = txOut
     }
@@ -34,12 +39,12 @@ class TxOutMap {
         return dictionary[label]
     }
 
-    func setTx(tx: Transaction) {
+    mutating func setTx(tx: Transaction) {
         let txId = tx.txHash.hex
-        tx.outputs.enumerated().forEach({ (index, txOut) in
+        tx.outputs.enumerated().forEach { index, txOut in
             let label = txId + ":" + String(index)
             dictionary[label] = txOut
-        })
+        }
     }
 
 }
