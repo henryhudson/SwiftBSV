@@ -12,7 +12,13 @@ import CryptoSwift
 // MARK: - BUMP Structures
 
 /// A leaf node in a BUMP Merkle tree level
-public struct BUMPLeaf {
+///
+/// Sendable: structurally trivial — `let`-only stored properties of
+/// `Sendable` types (UInt64, Data?, Bool). Required so callers can
+/// pass parsed BUMPs across actor boundaries (e.g. caching from the
+/// receiver-side `internalizeAction` MainActor context into the
+/// `SPVService` actor's local store).
+public struct BUMPLeaf: Sendable {
     public let offset: UInt64
     public let hash: Data?       // 32 bytes, nil if duplicate
     public let txid: Bool        // true if this hash is a client transaction ID
@@ -27,7 +33,7 @@ public struct BUMPLeaf {
 }
 
 /// One level of a BUMP Merkle tree
-public struct BUMPLevel {
+public struct BUMPLevel: Sendable {
     public let leaves: [BUMPLeaf]
 
     public init(leaves: [BUMPLeaf]) {
@@ -36,7 +42,7 @@ public struct BUMPLevel {
 }
 
 /// A complete BUMP (Binary Unified Merkle Path) per BRC-74
-public struct BUMP {
+public struct BUMP: Sendable {
     public let blockHeight: UInt64
     public let treeHeight: UInt8
     public let levels: [BUMPLevel]

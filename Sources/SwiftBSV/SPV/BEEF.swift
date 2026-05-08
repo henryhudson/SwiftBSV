@@ -12,7 +12,12 @@ import Foundation
 // MARK: - BEEF Structures
 
 /// A transaction within a BEEF structure
-public struct BEEFTransaction {
+///
+/// Sendable: `let`-only stored properties of `Sendable` types (Data,
+/// Bool, UInt64?). Required so receivers can pass parsed BEEF
+/// transactions across actor boundaries — e.g. from the MainActor
+/// `internalizeAction` to the SPVService actor for BUMP caching.
+public struct BEEFTransaction: Sendable {
     public let rawTx: Data
     public let hasBUMP: Bool
     public let bumpIndex: UInt64?
@@ -26,7 +31,7 @@ public struct BEEFTransaction {
 
 /// Background Evaluation Extended Format (BRC-62).
 /// Bundles transactions with their Merkle proofs for offline SPV verification.
-public struct BEEF {
+public struct BEEF: Sendable {
     public static let versionMarker: UInt32 = 0x0100_BEEF
 
     public let version: UInt32
