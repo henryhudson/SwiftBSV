@@ -25,10 +25,14 @@
 
 import Foundation
 
-/// Raised when a deserialization read runs past the end of the byte
-/// stream — a truncated or malformed transaction, rather than a crash.
+/// Raised when a transaction cannot be deserialized — a truncated or
+/// structurally invalid byte stream, rather than a crash.
 public enum DeserializationError: Error, Equatable {
+    /// A read ran past the end of the byte stream — truncated input.
     case unexpectedEndOfStream
+    /// A length/count field declares a value too large to represent —
+    /// the stream is structurally invalid, not merely short.
+    case malformedData
 }
 
 class ByteStream {
@@ -59,16 +63,16 @@ class ByteStream {
         case 0...252:
             length = UInt64(len); offset += 1
         case 0xfd:
+            guard availableBytes >= 3 else { throw DeserializationError.unexpectedEndOfStream }
             offset += 1
-            guard availableBytes >= 2 else { throw DeserializationError.unexpectedEndOfStream }
             length = UInt64(data[offset..<(offset + 2)].to(type: UInt16.self)); offset += 2
         case 0xfe:
+            guard availableBytes >= 5 else { throw DeserializationError.unexpectedEndOfStream }
             offset += 1
-            guard availableBytes >= 4 else { throw DeserializationError.unexpectedEndOfStream }
             length = UInt64(data[offset..<(offset + 4)].to(type: UInt32.self)); offset += 4
         default: // 0xff
+            guard availableBytes >= 9 else { throw DeserializationError.unexpectedEndOfStream }
             offset += 1
-            guard availableBytes >= 8 else { throw DeserializationError.unexpectedEndOfStream }
             length = UInt64(data[offset..<(offset + 8)].to(type: UInt64.self)); offset += 8
         }
         return VarInt(length)
@@ -76,9 +80,8 @@ class ByteStream {
 
     func read(_ type: VarString.Type) throws -> VarString {
         let length = try read(VarInt.self).underlyingValue
-        guard let size = Int(exactly: length), availableBytes >= size else {
-            throw DeserializationError.unexpectedEndOfStream
-        }
+        guard let size = Int(exactly: length) else { throw DeserializationError.malformedData }
+        guard availableBytes >= size else { throw DeserializationError.unexpectedEndOfStream }
         let value = data[offset..<(offset + size)].to(type: String.self)
         offset += size
         return VarString(value)

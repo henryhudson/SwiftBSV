@@ -89,12 +89,12 @@ public struct Transaction: Equatable {
         let version = try byteStream.read(UInt32.self)
         let txInCount = try byteStream.read(VarInt.self)
         guard let inCount = Int(exactly: txInCount.underlyingValue) else {
-            throw DeserializationError.unexpectedEndOfStream
+            throw DeserializationError.malformedData
         }
         let inputs = try (0..<inCount).map { _ in try TransactionInput.deserialize(byteStream) }
         let txOutCount = try byteStream.read(VarInt.self)
         guard let outCount = Int(exactly: txOutCount.underlyingValue) else {
-            throw DeserializationError.unexpectedEndOfStream
+            throw DeserializationError.malformedData
         }
         let outputs = try (0..<outCount).map { _ in try TransactionOutput.deserialize(byteStream) }
         let lockTime = try byteStream.read(UInt32.self)

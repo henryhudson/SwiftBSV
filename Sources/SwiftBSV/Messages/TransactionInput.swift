@@ -61,7 +61,7 @@ public struct TransactionInput: Equatable {
         let previousOutput = try TransactionOutPoint.deserialize(byteStream)
         let scriptLength = try byteStream.read(VarInt.self)
         guard let len = Int(exactly: scriptLength.underlyingValue) else {
-            throw DeserializationError.unexpectedEndOfStream
+            throw DeserializationError.malformedData
         }
         let signatureScript = try byteStream.read(Data.self, count: len)
         let sequence = try byteStream.read(UInt32.self)

@@ -224,7 +224,9 @@ class TransactionTests: XCTestCase {
     }
 
     func testDeserializeThrowsOnEmptyData() {
-        XCTAssertThrowsError(try Transaction.deserialize(Data()))
+        XCTAssertThrowsError(try Transaction.deserialize(Data())) { error in
+            XCTAssertEqual(error as? DeserializationError, .unexpectedEndOfStream)
+        }
     }
 
     func testDeserializeStillParsesAValidTransaction() throws {

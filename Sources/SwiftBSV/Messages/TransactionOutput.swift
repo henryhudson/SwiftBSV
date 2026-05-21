@@ -63,7 +63,7 @@ public struct TransactionOutput: Equatable {
         let value = try byteStream.read(UInt64.self)
         let scriptLength = try byteStream.read(VarInt.self)
         guard let len = Int(exactly: scriptLength.underlyingValue) else {
-            throw DeserializationError.unexpectedEndOfStream
+            throw DeserializationError.malformedData
         }
         let lockingScript = try byteStream.read(Data.self, count: len)
         return TransactionOutput(value: value, lockingScript: lockingScript)
