@@ -202,8 +202,7 @@ public enum BEEFParser {
             offset += 32 // prev txid
             offset += 4  // prev index
             let scriptLen = try BUMPParser.readVarInt(data: data, offset: &offset)
-            guard offset + Int(scriptLen) + 4 <= data.count else { throw ParseError.unexpectedEnd }
-            offset += Int(scriptLen)
+            offset = try offsetAfterScript(ofLength: scriptLen, from: offset, trailing: 4, in: data)
             offset += 4  // sequence
         }
         let outputCount = try BUMPParser.readVarInt(data: data, offset: &offset)
@@ -211,11 +210,31 @@ public enum BEEFParser {
             guard offset + 8 <= data.count else { throw ParseError.unexpectedEnd }
             offset += 8  // satoshis
             let scriptLen = try BUMPParser.readVarInt(data: data, offset: &offset)
-            guard offset + Int(scriptLen) <= data.count else { throw ParseError.unexpectedEnd }
-            offset += Int(scriptLen)
+            offset = try offsetAfterScript(ofLength: scriptLen, from: offset, trailing: 0, in: data)
         }
         guard offset + 4 <= data.count else { throw ParseError.unexpectedEnd }
         offset += 4 // locktime
+    }
+
+    /// The offset advanced past a script of `scriptLen` bytes.
+    ///
+    /// `scriptLen` is a varint from untrusted BEEF, so a plain `Int(scriptLen)`
+    /// or `offset + Int(scriptLen)` could trap on a value that overflows `Int`.
+    /// Here the conversion and the arithmetic are done without trapping: a
+    /// length unrepresentable as `Int`, or whose arithmetic overflows, throws
+    /// `.invalidData`; a representable length that simply runs past the buffer
+    /// throws `.unexpectedEnd`. `trailing` is the count of fixed bytes that must
+    /// also fit after the script — 4 for an input's sequence field, 0 for an
+    /// output.
+    private static func offsetAfterScript(
+        ofLength scriptLen: UInt64, from offset: Int, trailing: Int, in data: Data
+    ) throws -> Int {
+        guard let length = Int(exactly: scriptLen) else { throw ParseError.invalidData }
+        let (afterScript, scriptOverflow) = offset.addingReportingOverflow(length)
+        let (afterTrailing, trailingOverflow) = afterScript.addingReportingOverflow(trailing)
+        guard !scriptOverflow, !trailingOverflow else { throw ParseError.invalidData }
+        guard afterTrailing <= data.count else { throw ParseError.unexpectedEnd }
+        return afterScript
     }
 }
 
