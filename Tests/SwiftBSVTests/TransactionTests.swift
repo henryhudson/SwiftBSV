@@ -19,7 +19,7 @@ class TransactionTests: XCTestCase {
     let tx2buf = Data(hex: tx2hex)
 
     func testSigHashSingleBug() {
-        var tx = Transaction.deserialize(tx2buf)
+        var tx = try! Transaction.deserialize(tx2buf)
         tx.outputs = [tx.outputs[0]]
 
         let hashBuf = TransactionInputSigner.signatureHash(tx: tx, signatureVersion: .forkId, sighashType: SighashType.BTC.SINGLE, nIn: 1, subScript: Script(), value: 0)
@@ -30,7 +30,7 @@ class TransactionTests: XCTestCase {
     func testKnowntx() {
         let txraw = "907c2bc503ade11cc3b04eb2918b6f547b0630ab569273824748c87ea14b0696526c66ba740200000004ab65ababfd1f9bdd4ef073c7afc4ae00da8a66f429c917a0081ad1e1dabce28d373eab81d8628de802000000096aab5253ab52000052ad042b5f25efb33beec9f3364e8a9139e8439d9d7e26529c3c30b6c3fd89f8684cfd68ea0200000009ab53526500636a52ab599ac2fe02a526ed040000000008535300516352515164370e010000000003006300ab2ec229"
 
-        let tx = Transaction.deserialize(Data(hex: txraw))
+        let tx = try! Transaction.deserialize(Data(hex: txraw))
         let sighash = 1864164639
         let hash = TransactionInputSigner.signatureHash(tx: tx, signatureVersion: .forkId, sighashType: SighashType(i: sighash), nIn: 2, subScript: Script(), value: 0)
 
@@ -40,7 +40,7 @@ class TransactionTests: XCTestCase {
     func testKnowntx2() {
         let txraw = "b1c0b71804dff30812b92eefb533ac77c4b9fdb9ab2f77120a76128d7da43ad70c20bbfb990200000002536392693e6001bc59411aebf15a3dc62a6566ec71a302141b0c730a3ecc8de5d76538b30f55010000000665535252ac514b740c6271fb9fe69fdf82bf98b459a7faa8a3b62f3af34943ad55df4881e0d93d3ce0ac0200000000c4158866eb9fb73da252102d1e64a3ce611b52e873533be43e6883137d0aaa0f63966f060000000001abffffffff04a605b604000000000851006a656a630052f49a0300000000000252515a94e1050000000009abac65ab0052abab00fd8dd002000000000651535163526a2566852d"
 
-        let tx = Transaction.deserialize(Data(hex: txraw))
+        let tx = try! Transaction.deserialize(Data(hex: txraw))
         let serial = tx.serialized().hex
 
         XCTAssertEqual(txraw, serial)
@@ -159,7 +159,7 @@ class TransactionTests: XCTestCase {
             let sighashOldHex = vector[5] as! String
 
             let script = Script(data: raw_script)!
-            let tx = Transaction.deserialize(raw_tx)
+            let tx = try! Transaction.deserialize(raw_tx)
 
             XCTAssertEqual(tx.serialized().hex, raw_tx.hex)
 
@@ -200,7 +200,7 @@ class TransactionTests: XCTestCase {
 
             let script = Script(data: scriptBuf)!
 
-            let tx = Transaction.deserialize(txBuf)
+            let tx = try! Transaction.deserialize(txBuf)
 
             XCTAssertEqual(tx.serialized().hex, txBuf.hex)
 
@@ -216,6 +216,23 @@ class TransactionTests: XCTestCase {
 
     }
 
-    
+    func testDeserializeThrowsOnTruncatedTransaction() {
+        let truncated = Data(hex: "01000000014b943d0e6275f29958760eb5977696023a99df63ee5977698053136fa03a10b9020000006a47304402")
+        XCTAssertThrowsError(try Transaction.deserialize(truncated)) { error in
+            XCTAssertEqual(error as? DeserializationError, .unexpectedEndOfStream)
+        }
+    }
+
+    func testDeserializeThrowsOnEmptyData() {
+        XCTAssertThrowsError(try Transaction.deserialize(Data()))
+    }
+
+    func testDeserializeStillParsesAValidTransaction() throws {
+        let validHex = "01000000014b943d0e6275f29958760eb5977696023a99df63ee5977698053136fa03a10b9020000006a47304402204cbb8b541a9c62c9e27ab4a3b87bd8e0f4b63199438ba45283c93d5ad0ef7fe202207899680061109622c633d1786ea7e090d24517ff3109192033989da86054073b41210265bc3edcf9823e9c5e74a2bb9c1cf29b2515324b423d99bc059a534af5f240e2ffffffff0300000000000000001a006a1748656c6c6f2c20796f75206172652077656c636f6d652ee8030000000000001976a914f8660a6a535732d80060e64e4aa1c8e402ecc91f88acf36eaf44000000001976a914fe5e3903387a194385ee6f5413bf825f709b1e0088ac00000000"
+        let tx = try Transaction.deserialize(Data(hex: validHex))
+        XCTAssertEqual(tx.inputs.count, 1)
+        XCTAssertEqual(tx.outputs.count, 3)
+        XCTAssertEqual(tx.version, 1)
+    }
 
 }

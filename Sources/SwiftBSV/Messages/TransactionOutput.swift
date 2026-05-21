@@ -59,10 +59,13 @@ public struct TransactionOutput: Equatable {
         return data
     }
 
-    static func deserialize(_ byteStream: ByteStream) -> TransactionOutput {
-        let value = byteStream.read(UInt64.self)
-        let scriptLength = byteStream.read(VarInt.self)
-        let lockingScript = byteStream.read(Data.self, count: Int(scriptLength.underlyingValue))
+    static func deserialize(_ byteStream: ByteStream) throws -> TransactionOutput {
+        let value = try byteStream.read(UInt64.self)
+        let scriptLength = try byteStream.read(VarInt.self)
+        guard let len = Int(exactly: scriptLength.underlyingValue) else {
+            throw DeserializationError.unexpectedEndOfStream
+        }
+        let lockingScript = try byteStream.read(Data.self, count: len)
         return TransactionOutput(value: value, lockingScript: lockingScript)
     }
 

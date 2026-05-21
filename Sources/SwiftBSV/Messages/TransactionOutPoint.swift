@@ -43,9 +43,9 @@ public struct TransactionOutPoint: Equatable {
         return data
     }
 
-    static func deserialize(_ byteStream: ByteStream) -> TransactionOutPoint {
-        let hash = Data(byteStream.read(Data.self, count: 32))
-        let index = byteStream.read(UInt32.self)
+    static func deserialize(_ byteStream: ByteStream) throws -> TransactionOutPoint {
+        let hash = Data(try byteStream.read(Data.self, count: 32))
+        let index = try byteStream.read(UInt32.self)
         return TransactionOutPoint(hash: hash, index: index)
     }
 }

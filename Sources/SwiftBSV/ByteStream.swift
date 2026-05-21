@@ -25,6 +25,12 @@
 
 import Foundation
 
+/// Raised when a deserialization read runs past the end of the byte
+/// stream — a truncated or malformed transaction, rather than a crash.
+public enum DeserializationError: Error, Equatable {
+    case unexpectedEndOfStream
+}
+
 class ByteStream {
     let data: Data
     private var offset = 0
@@ -37,51 +43,50 @@ class ByteStream {
         self.data = data
     }
 
-    func read<T>(_ type: T.Type) -> T {
+    func read<T>(_ type: T.Type) throws -> T {
         let size = MemoryLayout<T>.size
+        guard availableBytes >= size else { throw DeserializationError.unexpectedEndOfStream }
         let value = data[offset..<(offset + size)].to(type: type)
         offset += size
         return value
     }
 
-    func read(_ type: VarInt.Type) -> VarInt {
+    func read(_ type: VarInt.Type) throws -> VarInt {
+        guard availableBytes >= 1 else { throw DeserializationError.unexpectedEndOfStream }
         let len = data[offset..<(offset + 1)].to(type: UInt8.self)
         let length: UInt64
         switch len {
         case 0...252:
-            length = UInt64(len)
-            offset += 1
+            length = UInt64(len); offset += 1
         case 0xfd:
             offset += 1
-            length = UInt64(data[offset..<(offset + 2)].to(type: UInt16.self))
-            offset += 2
+            guard availableBytes >= 2 else { throw DeserializationError.unexpectedEndOfStream }
+            length = UInt64(data[offset..<(offset + 2)].to(type: UInt16.self)); offset += 2
         case 0xfe:
             offset += 1
-            length = UInt64(data[offset..<(offset + 4)].to(type: UInt32.self))
-            offset += 4
-        case 0xff:
+            guard availableBytes >= 4 else { throw DeserializationError.unexpectedEndOfStream }
+            length = UInt64(data[offset..<(offset + 4)].to(type: UInt32.self)); offset += 4
+        default: // 0xff
             offset += 1
-            length = UInt64(data[offset..<(offset + 8)].to(type: UInt64.self))
-            offset += 8
-        default:
-            offset += 1
-            length = UInt64(data[offset..<(offset + 8)].to(type: UInt64.self))
-            offset += 8
+            guard availableBytes >= 8 else { throw DeserializationError.unexpectedEndOfStream }
+            length = UInt64(data[offset..<(offset + 8)].to(type: UInt64.self)); offset += 8
         }
         return VarInt(length)
     }
 
-    func read(_ type: VarString.Type) -> VarString {
-        let length = read(VarInt.self).underlyingValue
-        let size = Int(length)
+    func read(_ type: VarString.Type) throws -> VarString {
+        let length = try read(VarInt.self).underlyingValue
+        guard let size = Int(exactly: length), availableBytes >= size else {
+            throw DeserializationError.unexpectedEndOfStream
+        }
         let value = data[offset..<(offset + size)].to(type: String.self)
         offset += size
         return VarString(value)
     }
 
-    func read(_ type: Data.Type, count: Int) -> Data {
-        guard availableBytes >= count else {
-            return Data()
+    func read(_ type: Data.Type, count: Int) throws -> Data {
+        guard count >= 0, availableBytes >= count else {
+            throw DeserializationError.unexpectedEndOfStream
         }
         let value = data[offset..<(offset + count)]
         offset += count

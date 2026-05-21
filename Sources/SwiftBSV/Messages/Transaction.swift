@@ -80,20 +80,24 @@ public struct Transaction: Equatable {
         return inputs.count == 1 && inputs[0].isCoinbase()
     }
 
-    public static func deserialize(_ data: Data) -> Transaction {
+    public static func deserialize(_ data: Data) throws -> Transaction {
         let byteStream = ByteStream(data)
-        return deserialize(byteStream)
+        return try deserialize(byteStream)
     }
 
-    static func deserialize(_ byteStream: ByteStream) -> Transaction {
-        let version = byteStream.read(UInt32.self)
-        let txInCount = byteStream.read(VarInt.self)
-        let inputs = (0..<Int(txInCount.underlyingValue))
-            .map { _ in TransactionInput.deserialize(byteStream) }
-        let txOutCount = byteStream.read(VarInt.self)
-        let outputs = (0..<Int(txOutCount.underlyingValue))
-            .map { _ in TransactionOutput.deserialize(byteStream) }
-        let lockTime = byteStream.read(UInt32.self)
+    static func deserialize(_ byteStream: ByteStream) throws -> Transaction {
+        let version = try byteStream.read(UInt32.self)
+        let txInCount = try byteStream.read(VarInt.self)
+        guard let inCount = Int(exactly: txInCount.underlyingValue) else {
+            throw DeserializationError.unexpectedEndOfStream
+        }
+        let inputs = try (0..<inCount).map { _ in try TransactionInput.deserialize(byteStream) }
+        let txOutCount = try byteStream.read(VarInt.self)
+        guard let outCount = Int(exactly: txOutCount.underlyingValue) else {
+            throw DeserializationError.unexpectedEndOfStream
+        }
+        let outputs = try (0..<outCount).map { _ in try TransactionOutput.deserialize(byteStream) }
+        let lockTime = try byteStream.read(UInt32.self)
         return Transaction(version: version, inputs: inputs, outputs: outputs, lockTime: lockTime)
     }
 }

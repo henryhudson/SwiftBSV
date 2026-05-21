@@ -289,15 +289,15 @@ public struct ChunkHelpers {
 
         let br = ByteStream(buffer)
 
-        while (br.availableBytes > 0) {
-            let opCodeNum = br.read(UInt8.self)
+        while br.availableBytes > 0 {
+            guard let opCodeNum = try? br.read(UInt8.self) else { break }
 
             var len = 0
             var buf = Data()
 
             if opCodeNum > 0 && opCodeNum < OpCode.OP_PUSHDATA1.value {
                 len = Int(opCodeNum)
-                let data = br.read(Data.self, count: len)
+                guard let data = try? br.read(Data.self, count: len) else { break }
                 chunks.append(
                     Chunk(
                         buffer: data,
@@ -306,9 +306,10 @@ public struct ChunkHelpers {
                     )
                 )
             } else if opCodeNum == OpCode.OP_PUSHDATA1.value {
-                len = Int(br.read(UInt8.self))
-
-                buf = br.read(Data.self, count: len)
+                guard let rawLen = try? br.read(UInt8.self) else { break }
+                len = Int(rawLen)
+                guard let data = try? br.read(Data.self, count: len) else { break }
+                buf = data
                 chunks.append(
                     Chunk(
                         buffer: buf,
@@ -317,8 +318,10 @@ public struct ChunkHelpers {
                     )
                 )
             } else if opCodeNum == OpCode.OP_PUSHDATA2.value {
-                len = Int(br.read(UInt16.self))
-                buf = br.read(Data.self, count: len)
+                guard let rawLen = try? br.read(UInt16.self) else { break }
+                len = Int(rawLen)
+                guard let data = try? br.read(Data.self, count: len) else { break }
+                buf = data
                 chunks.append(
                     Chunk(
                         buffer: buf,
@@ -327,8 +330,10 @@ public struct ChunkHelpers {
                     )
                 )
             } else if opCodeNum == OpCode.OP_PUSHDATA4.value {
-                len = Int(br.read(UInt32.self))
-                buf = br.read(Data.self, count: len)
+                guard let rawLen = try? br.read(UInt32.self) else { break }
+                len = Int(rawLen)
+                guard let data = try? br.read(Data.self, count: len) else { break }
+                buf = data
                 chunks.append(
                     Chunk(
                         buffer: buf,
@@ -345,12 +350,9 @@ public struct ChunkHelpers {
                     )
                 )
             }
-
-
         }
 
         return chunks
-
     }
 
     public static func chunksToBuffer(_ chunks: [Chunk]) -> Data {
