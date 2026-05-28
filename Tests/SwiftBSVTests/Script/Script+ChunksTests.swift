@@ -37,6 +37,31 @@ class ScriptPlusChunksTests: XCTestCase {
         XCTAssertEqual(string, "OP_SHA256 32 0x8cc17e2a2b10e1da145488458a6edec4a1fdb1921c2d5ccbc96aa0ed31b4d5f8 OP_EQUALVERIFY OP_DUP OP_HASH160 20 0x1451baa3aad777144a0759998a03538018dd7b4b OP_EQUALVERIFY OP_CHECKSIGVERIFY OP_EQUALVERIFY OP_DUP OP_HASH160 20 0x1451baa3aad777144a0759998a03538018dd7b4b OP_EQUALVERIFY OP_CHECKSIG")
     }
 
+    func testScriptDataPushData4LengthIsFourBytes() {
+        // OP_PUSHDATA4 takes a 4-byte little-endian length. Regression
+        // guard: ScriptChunkHelper.scriptData (the encoder Script.appendData
+        // / emitData use) previously emitted an 8-byte UInt64 length,
+        // producing a malformed, unspendable push for data 65536..4GB.
+
+        // Forced PUSHDATA4 with a tiny payload — length 3 → "03000000".
+        let small = Data([0x01, 0x02, 0x03])
+        guard let forced = ScriptChunkHelper.scriptData(for: small, preferredLengthEncoding: 4) else {
+            return XCTFail("scriptData returned nil for forced PUSHDATA4")
+        }
+        XCTAssertEqual(forced.prefix(5).hex, "4e03000000")   // 0x4e + 4-byte LE length
+        XCTAssertEqual(forced.count, 5 + small.count)
+
+        // Auto-encoding of 65536 bytes (one past the PUSHDATA2 0xffff ceiling)
+        // must select PUSHDATA4 with a 4-byte length 0x00010000 → "00000100" LE.
+        let big = Data(repeating: 0xab, count: 65536)
+        guard let auto = ScriptChunkHelper.scriptData(for: big, preferredLengthEncoding: -1) else {
+            return XCTFail("scriptData returned nil for 65536-byte payload")
+        }
+        XCTAssertEqual(auto.prefix(5).hex, "4e00000100")
+        XCTAssertEqual(auto.count, 5 + 65536)
+        XCTAssertEqual(Data(auto.suffix(65536)), big)
+    }
+
     func testChunksFromBitcoindString() {
 
         let bitcoindString = "'Azzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz' EQUAL"

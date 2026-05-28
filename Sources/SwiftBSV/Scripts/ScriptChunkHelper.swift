@@ -46,7 +46,11 @@ public struct ScriptChunkHelper {
             scriptData += UInt16(data.count)
         } else if UInt64(data.count) <= 0xffffffff && (preferredLengthEncoding == -1 || preferredLengthEncoding == 4) {
             scriptData += OpCode.OP_PUSHDATA4
-            scriptData += UInt64(data.count)
+            // OP_PUSHDATA4 takes a 4-byte little-endian length. This was
+            // UInt64 (8 bytes) — a malformed prefix — because UInt32's
+            // BinaryConvertible conformance was commented out; it is now
+            // enabled in Data+Script.swift.
+            scriptData += UInt32(data.count)
         } else {
             // Invalid preferredLength encoding or data size is too big.
             return nil

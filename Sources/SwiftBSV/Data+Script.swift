@@ -41,7 +41,8 @@ extension BinaryConvertible {
 }
 
 extension UInt16: BinaryConvertible {}
-//extension UInt32: BinaryConvertible {}
+// UInt32 intentionally conforms to DataConvertable (not BinaryConvertible)
+// to avoid an ambiguous `Data + UInt32` operator — see DataConvertable.swift.
 extension UInt64: BinaryConvertible {}
 extension Int8: BinaryConvertible {}
 extension Int16: BinaryConvertible {}
