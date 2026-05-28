@@ -80,18 +80,23 @@ let utxo = TransactionOutput(
     lockingScript: alice.address.toTxOutputScript().data
 )
 
-let builder = TxBuilder()
-    .setFeePerKb(50)
+// TxBuilder is a struct. setVersion/setFeePerKb/setChangeAddress are
+// non-mutating (return a copy, chainable); inputFromPubKeyHash /
+// outputToAddress / build / signInTx are `mutating`, so the binding
+// must be `var` and the mutating calls are separate statements.
+var builder = TxBuilder()
+    .setFeePerKb(50)                  // UInt64 sats per kilobyte
     .setChangeAddress(alice.address)
-    .inputFromPubKeyHash(
-        txHashBuffer: prevTxid,
-        txOutNum: 0,
-        txOut: utxo,
-        pubKey: alice.publicKey
-    )
-    .outputToAddress(value: 50_000, address: bob)
 
-let built = try builder.build(useAllInputs: true)
+builder.inputFromPubKeyHash(
+    txHashBuffer: prevTxid,
+    txOutNum: 0,
+    txOut: utxo,
+    pubKey: alice.publicKey
+)
+builder.outputToAddress(value: 50_000, address: bob)
+
+var built = try builder.build(useAllInputs: true)
 _ = built.signInTx(nIn: 0, privateKey: alice)
 
 let raw: Data = built.transaction.serialized()
@@ -101,17 +106,20 @@ let txid: String = built.transaction.txID
 ### Encrypt a message (BRC-2 ECIES, BIE1 wire format)
 
 ```swift
+let sender = PrivateKey(network: .mainnet)
 let recipient = PrivateKey(network: .mainnet)
 
+// senderPrivateKey is required (non-optional) — the sender's pubkey is
+// carried on the wire and HMAC'd, so decryption needs no separate sender arg.
 let cipher = try ECIESEncryption.encrypt(
     plaintext: "secret".data(using: .utf8)!,
-    recipientPublicKey: recipient.publicKey,
-    senderPrivateKey: nil
+    senderPrivateKey: sender,
+    recipientPublicKey: recipient.publicKey
 )
 
 let recovered = try ECIESEncryption.decrypt(
     ciphertext: cipher,
-    privateKey: recipient
+    recipientPrivateKey: recipient
 )
 ```
 
