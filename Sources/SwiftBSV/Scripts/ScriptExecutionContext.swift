@@ -32,6 +32,9 @@ public class ScriptExecutionContext {
     public var verificationFlags: ScriptVerification?
 
     // Stack contains Data objects that are interpreted as numbers, bignums, booleans or raw data when needed.
+    // Direct assignment bypasses the per-element size cap enforced by
+    // pushToStack(_:) — acceptable for interactive steppers seeding
+    // preconditions outside consensus execution.
     public var stack = [Data]()
     // Used in ALTSTACK ops.
     public internal(set) var altStack = [Data]()
@@ -79,12 +82,21 @@ public class ScriptExecutionContext {
     /// Arms an existing context for CHECKSIG-family opcodes without
     /// disturbing its stacks — interactive steppers hold one long-lived
     /// context and load the transaction in later.
-    public func loadTransactionContext(transaction: Transaction, utxoToVerify: TransactionOutput, inputIndex: UInt32) {
-        guard transaction.inputs.count > inputIndex else { return }
+    ///
+    /// Returns `true` when arming succeeded, `false` when `inputIndex` is
+    /// out of range (context is left unchanged).
+    @discardableResult
+    public func loadTransactionContext(
+        transaction: Transaction,
+        utxoToVerify: TransactionOutput,
+        inputIndex: UInt32
+    ) -> Bool {
+        guard transaction.inputs.count > inputIndex else { return false }
         self.transaction = transaction
         self.utxoToVerify = utxoToVerify
         self.txinToVerify = transaction.inputs[Int(inputIndex)]
         self.inputIndex = inputIndex
+        return true
     }
 
     public var shouldExecute: Bool {

@@ -32,11 +32,14 @@ class ScriptContextSurfaceTests: XCTestCase {
         let context = ScriptExecutionContext()
         context.stack = [Data([0x05])]
         XCTAssertEqual(context.stack, [Data([0x05])])
+        // Verify through the context's own read-back API, not just the raw array.
+        XCTAssertTrue(context.bool(at: -1), "seeded value 0x05 must be truthy")
+        XCTAssertEqual(try context.number(at: -1), 5, "seeded value 0x05 must decode as 5")
     }
 
     func testLoadTransactionContextArmsChecksig() throws {
-        let signer = PrivateKey(network: .mainnet)
-        let recipient = PrivateKey(network: .mainnet)
+        let signer = PrivateKey(data: Data(repeating: 0x01, count: 32), network: .mainnet)
+        let recipient = PrivateKey(data: Data(repeating: 0x02, count: 32), network: .mainnet)
 
         let prevTxid = Data(repeating: 0xcd, count: 32)
         let utxo = TransactionOutput(
@@ -92,7 +95,10 @@ class ScriptContextSurfaceTests: XCTestCase {
 
         let context = ScriptExecutionContext()
         try context.pushToStack(Data([0x01]))
-        context.loadTransactionContext(transaction: signedTx, utxoToVerify: utxo, inputIndex: 0)
+        XCTAssertTrue(
+            context.loadTransactionContext(transaction: signedTx, utxoToVerify: utxo, inputIndex: 0),
+            "arming a valid inputIndex must return true"
+        )
         XCTAssertEqual(context.stack, [Data([0x01])], "arming must not clear the stack")
 
         try context.pushToStack(wireSig)
@@ -102,7 +108,7 @@ class ScriptContextSurfaceTests: XCTestCase {
     }
 
     func testLoadTransactionContextOutOfRangeIsNoOp() throws {
-        let signer = PrivateKey(network: .mainnet)
+        let signer = PrivateKey(data: Data(repeating: 0x03, count: 32), network: .mainnet)
 
         let prevTxid = Data(repeating: 0xab, count: 32)
         let utxo = TransactionOutput(
@@ -123,13 +129,18 @@ class ScriptContextSurfaceTests: XCTestCase {
 
         // Arm with a valid transaction first so we have known state.
         let context = ScriptExecutionContext()
-        context.loadTransactionContext(transaction: tx, utxoToVerify: utxo, inputIndex: 0)
+        XCTAssertTrue(
+            context.loadTransactionContext(transaction: tx, utxoToVerify: utxo, inputIndex: 0),
+            "valid arm must return true"
+        )
         XCTAssertEqual(context.utxoToVerify, utxo, "first arm must set utxoToVerify")
 
-        // Now try to arm with an out-of-range inputIndex — must be a no-op.
+        // Now try to arm with an out-of-range inputIndex — must return false and leave state unchanged.
         let anotherUtxo = TransactionOutput(value: 999, lockingScript: Data())
-        context.loadTransactionContext(transaction: tx, utxoToVerify: anotherUtxo, inputIndex: 5)
-
+        XCTAssertFalse(
+            context.loadTransactionContext(transaction: tx, utxoToVerify: anotherUtxo, inputIndex: 5),
+            "out-of-range inputIndex must return false"
+        )
         XCTAssertEqual(context.utxoToVerify, utxo, "out-of-range inputIndex must not replace the armed utxo")
     }
 }
