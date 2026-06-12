@@ -59,6 +59,17 @@ final class RestoredOpcodeTests: XCTestCase {
         XCTAssertEqual(context.stack.count, 2)
     }
 
+    func testOpMulMinTimesNegOneThrowsInvalidBignum() throws {
+        // Int32.min * -1 = 2_147_483_648 — fits Int64 but exceeds Int32.max.
+        try context.pushToStack(Int32.min)
+        try context.pushToStack(Int32(-1))
+        XCTAssertThrowsError(try OpCode.OP_MUL.execute(context)) {
+            guard case OpCodeExecutionError.invalidBignum = $0 else {
+                return XCTFail("expected invalidBignum, got \($0)")
+            }
+        }
+    }
+
     // MARK: - OP_INVERT (Genesis-restored)
 
     func testOpInvertFlipsBytes() throws {

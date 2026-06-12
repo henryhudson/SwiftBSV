@@ -32,7 +32,6 @@ public struct OpMul: OpCodeProtocol {
         // Restored by the BSV Genesis upgrade (2020); disabled only in pre-Genesis BTC.
         return true
     }
-
     // (x1 x2 -- out)
      public func mainProcess(_ context: ScriptExecutionContext) throws {
         try context.assertStackHeightGreaterThanOrEqual(2)
