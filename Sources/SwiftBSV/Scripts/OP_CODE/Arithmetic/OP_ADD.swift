@@ -34,9 +34,12 @@ public struct OpAdd: OpCodeProtocol {
 
         let x1 = try context.number(at: -2)
         let x2 = try context.number(at: -1)
-
+        let sum = Int64(x1) + Int64(x2)
+        guard let result = Int32(exactly: sum) else {
+            throw OpCodeExecutionError.invalidBignum
+        }
         context.stack.removeLast()
         context.stack.removeLast()
-        try context.pushToStack(x1 + x2)
+        try context.pushToStack(result)
     }
 }

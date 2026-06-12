@@ -23,13 +23,14 @@
 //
 import Foundation
 
-// (x y -- x*y) disabled
+// (x y -- x*y)
 public struct OpMul: OpCodeProtocol {
     public var value: UInt8 { return 0x95 }
     public var name: String { return "OP_MUL" }
 
     public func isEnabled() -> Bool {
-        return false
+        // Restored by the BSV Genesis upgrade (2020); disabled only in pre-Genesis BTC.
+        return true
     }
 
     // (x1 x2 -- out)
@@ -38,9 +39,12 @@ public struct OpMul: OpCodeProtocol {
 
         let x1 = try context.number(at: -2)
         let x2 = try context.number(at: -1)
-
+        let product = Int64(x1) * Int64(x2)
+        guard let result = Int32(exactly: product) else {
+            throw OpCodeExecutionError.invalidBignum
+        }
         context.stack.removeLast()
         context.stack.removeLast()
-        try context.pushToStack(x1 * x2)
+        try context.pushToStack(result)
     }
 }

@@ -33,7 +33,11 @@ public struct OpNegate: OpCodeProtocol {
         try context.assertStackHeightGreaterThanOrEqual(1)
 
         let input = try context.number(at: -1)
+        let negated = -Int64(input)
+        guard let result = Int32(exactly: negated) else {
+            throw OpCodeExecutionError.invalidBignum
+        }
         context.stack.removeLast()
-        try context.pushToStack(-input)
+        try context.pushToStack(result)
     }
 }

@@ -416,14 +416,15 @@ class OpCodeTests: XCTestCase {
     }
     
     func testOpInvert() {
+        // OP_INVERT was restored by the BSV Genesis upgrade (2020); it no longer throws .disabled.
+        // Full byte-flipping behaviour is asserted in RestoredOpcodeTests.testOpInvertFlipsBytes.
         let opcode = OpCode.OP_INVERT
-        
         do {
+            try context.pushToStack(Data([0xff]))
             try opcode.execute(context)
-        } catch OpCodeExecutionError.disabled {
-            // success
+            XCTAssertEqual(context.data(at: -1), Data([0x00]))
         } catch let error {
-            XCTFail("Shoud throw OpCodeExecutionError.disabled, but threw \(error)")
+            XCTFail("\(opcode.name) execution should not fail. Error: \(error)")
         }
     }
     

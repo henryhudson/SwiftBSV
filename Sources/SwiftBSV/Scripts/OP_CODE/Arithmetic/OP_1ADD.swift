@@ -33,7 +33,11 @@ public struct Op1Add: OpCodeProtocol {
         try context.assertStackHeightGreaterThanOrEqual(1)
 
         let input = try context.number(at: -1)
+        let sum = Int64(input) + 1
+        guard let result = Int32(exactly: sum) else {
+            throw OpCodeExecutionError.invalidBignum
+        }
         context.stack.removeLast()
-        try context.pushToStack(input + 1)
+        try context.pushToStack(result)
     }
 }

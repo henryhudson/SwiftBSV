@@ -24,13 +24,14 @@
 
 import Foundation
 
-// Flips all of the bits in the input. disabled.
+// Flips all of the bits in the input.
 public struct OpInvert: OpCodeProtocol {
     public var value: UInt8 { return 0x83 }
     public var name: String { return "OP_INVERT" }
 
     public func isEnabled() -> Bool {
-        return false
+        // Restored by the BSV Genesis upgrade (2020); disabled only in pre-Genesis BTC.
+        return true
     }
 
     // input : in
@@ -39,7 +40,9 @@ public struct OpInvert: OpCodeProtocol {
         try context.assertStackHeightGreaterThanOrEqual(1)
 
         let x = context.stack.removeLast()
-        let output: Data = Data(from: x.map { ~$0 })
+        // Data(from:) interprets its argument as raw bytes of the Swift type —
+        // wrong for [UInt8]. Data(_: [UInt8]) copies the array elements directly.
+        let output = Data(x.map { ~$0 })
         context.stack.append(output)
     }
 }
