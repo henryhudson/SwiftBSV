@@ -32,7 +32,7 @@ public class ScriptExecutionContext {
     public var verificationFlags: ScriptVerification?
 
     // Stack contains Data objects that are interpreted as numbers, bignums, booleans or raw data when needed.
-    public internal(set) var stack = [Data]()
+    public var stack = [Data]()
     // Used in ALTSTACK ops.
     public internal(set) var altStack = [Data]()
     // Holds an array of Bool values to keep track of if/else branches.
@@ -76,6 +76,17 @@ public class ScriptExecutionContext {
         self.txinToVerify = transaction.inputs[Int(inputIndex)]
         self.inputIndex = inputIndex
     }
+    /// Arms an existing context for CHECKSIG-family opcodes without
+    /// disturbing its stacks — interactive steppers hold one long-lived
+    /// context and load the transaction in later.
+    public func loadTransactionContext(transaction: Transaction, utxoToVerify: TransactionOutput, inputIndex: UInt32) {
+        guard transaction.inputs.count > inputIndex else { return }
+        self.transaction = transaction
+        self.utxoToVerify = utxoToVerify
+        self.txinToVerify = transaction.inputs[Int(inputIndex)]
+        self.inputIndex = inputIndex
+    }
+
     public var shouldExecute: Bool {
         return !conditionStack.contains(false)
     }
