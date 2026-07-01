@@ -13,6 +13,24 @@ import Foundation
 import CryptoSwift
 import secp256k1
 
+/// Process-wide libsecp256k1 context.
+///
+/// Building a context precomputes the elliptic-curve multiplication tables —
+/// libsecp256k1 documents this as roughly 100x the cost of a single verify and
+/// warns explicitly against constructing one per operation. The previous code
+/// created and destroyed a fresh context on every key derivation, which pegged
+/// the CPU and hung the wallet's address-rediscovery sweep.
+///
+/// A constructed context is safe to use concurrently from multiple threads for
+/// const operations (sign / verify / parse / serialize); only destroy and
+/// randomize need exclusive access. We build it exactly once (`static let` gives
+/// thread-safe once-init) with the combined SIGN|VERIFY capability, and never
+/// destroy or re-randomize it — so every later call is lock-free.
+enum Secp256k1Context {
+    static let shared: OpaquePointer? =
+        secp256k1_context_create(UInt32(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY))
+}
+
 public final class Crypto {
 
     public static func ripemd160(_ data: Data) -> Data {
@@ -166,10 +184,9 @@ public final class Crypto {
     }
 
     public static func computePublicKey(fromPrivateKey privateKey: Data, compressed: Bool) -> Data {
-        guard let ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_SIGN)) else {
+        guard let ctx = Secp256k1Context.shared else {
             return Data()
         }
-        defer { secp256k1_context_destroy(ctx) }
         var pubkey = secp256k1_pubkey()
         var seckey: [UInt8] = privateKey.map { $0 }
         if seckey.count != 32 {
@@ -205,10 +222,9 @@ public final class Crypto {
     ///
     /// Useful to convert a compressed pubKey into an uncompressed pubKey
     public static func serializePublicKey(from publicKey: Data, compressed: Bool = true) -> Data {
-        guard let ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_VERIFY)) else {
+        guard let ctx = Secp256k1Context.shared else {
             return Data()
         }
-        defer { secp256k1_context_destroy(ctx) }
         var pubkey = secp256k1_pubkey()
         var input: [UInt8] = publicKey.map { $0 }
 

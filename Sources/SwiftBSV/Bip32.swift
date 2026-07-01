@@ -315,10 +315,9 @@ class _HDKey {
         let derivedChainCode: [UInt8] = digest[32..<64].map { $0 }
         var result: Data
         if let privateKey = self.privateKey {
-            guard let ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_SIGN)) else {
+            guard let ctx = Secp256k1Context.shared else {
                 return nil
             }
-            defer { secp256k1_context_destroy(ctx) }
             var privateKeyBytes = privateKey.map { $0 }
             var derivedPrivateKeyBytes = derivedPrivateKey.map { $0 }
             if secp256k1_ec_privkey_tweak_add(ctx, &privateKeyBytes, &derivedPrivateKeyBytes) == 0 {
@@ -326,10 +325,9 @@ class _HDKey {
             }
             result = Data(privateKeyBytes)
         } else {
-            guard let ctx = secp256k1_context_create(UInt32(SECP256K1_CONTEXT_VERIFY)) else {
+            guard let ctx = Secp256k1Context.shared else {
                 return nil
             }
-            defer { secp256k1_context_destroy(ctx) }
             let publicKeyBytes: [UInt8] = publicKey.map { $0 }
             var secpPubkey = secp256k1_pubkey()
             if secp256k1_ec_pubkey_parse(ctx, &secpPubkey, publicKeyBytes, publicKeyBytes.count) == 0 {
