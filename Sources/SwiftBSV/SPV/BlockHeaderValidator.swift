@@ -29,7 +29,22 @@ public protocol BlockHeader {
 /// Validates block headers according to Bitcoin consensus rules.
 public struct BlockHeaderValidator: Sendable {
 
-    public init() {}
+    /// The easiest (largest) block target this validator will accept. Defaults
+    /// to `mainnetPowLimit`, the genesis / consensus limit. A caller that holds
+    /// a tighter, trusted lower bound on the network's real difficulty — a
+    /// recent checkpoint's difficulty, say — can pass a smaller target here.
+    /// Then a header claiming an implausibly-easy difficulty is rejected even
+    /// though it self-consistently meets its own `bits`: this is what stops a
+    /// cheaply-mined low-difficulty header forgery from validating against a
+    /// chain whose true difficulty is orders of magnitude higher. The genesis
+    /// gap is wide (~34 bits at the current mainnet checkpoint), so a floor set
+    /// far below the checkpoint difficulty rejects such forgeries while leaving
+    /// enormous headroom for any real difficulty swing.
+    public let maxTarget: UInt256
+
+    public init(maxTarget: UInt256 = BlockHeaderValidator.mainnetPowLimit) {
+        self.maxTarget = maxTarget
+    }
 
     /// Validate a single block header's proof-of-work.
     public func validateProofOfWork<H: BlockHeader>(header: H) -> Bool {
@@ -155,11 +170,13 @@ public struct BlockHeaderValidator: Sendable {
     /// invalid by consensus regardless of self-consistency. Equals
     /// 0x00000000ffff0000…0000 (the genesis difficulty).
     public static let mainnetPowLimit: UInt256 = {
-        // 0x1d00ffff in compact bits — the genesis target.
+        // 0x1d00ffff in compact bits → target 0x00000000ffff0000…0000: the
+        // 0xffff sits in big-endian bytes 4 and 5 (bit positions 208–223).
+        // (This previously placed it in bytes 3–4, one byte too significant,
+        // making the accepted limit 256× too lenient.)
         var bytes = [UInt8](repeating: 0, count: 32)
-        bytes[2] = 0x00
-        bytes[3] = 0xff
         bytes[4] = 0xff
+        bytes[5] = 0xff
         return UInt256(data: Data(bytes))
     }()
 
@@ -193,10 +210,12 @@ public struct BlockHeaderValidator: Sendable {
 
         let target = UInt256(coefficient) << ((exponent - 3) * 8)
 
-        // Reject targets above the protocol PoW limit. Without this a peer
-        // could feed a chain of headers with arbitrarily easy `bits`
-        // fields and every header would self-consistency-validate.
-        guard target <= BlockHeaderValidator.mainnetPowLimit else { return nil }
+        // Reject targets above this validator's `maxTarget` — the genesis /
+        // consensus limit by default, or a tighter checkpoint-anchored floor
+        // when the caller supplies one. Without this a peer could feed a chain
+        // of headers with arbitrarily easy `bits` fields and every header would
+        // self-consistency-validate.
+        guard target <= maxTarget else { return nil }
 
         return target
     }
