@@ -122,6 +122,21 @@ extension Data {
 
 extension Data {
     public var hex: String {
-        return reduce("") { $0 + String(format: "%02x", $1) }
+        // O(n): nibbles written straight into preallocated UTF-8 storage.
+        // The previous `reduce("") { $0 + String(format:) }` built a fresh
+        // string (and parsed a format string) per byte — quadratic, invisible
+        // on a 300-byte payment, unusable at inscription scale: a 32 MB
+        // transaction's hex never finished (2026-07-12, the xtext media
+        // archive). This form does the same bytes in milliseconds.
+        let digits = Array("0123456789abcdef".utf8)
+        return String(unsafeUninitializedCapacity: count * 2) { buffer in
+            var i = 0
+            for byte in self {
+                buffer[i] = digits[Int(byte >> 4)]
+                buffer[i + 1] = digits[Int(byte & 0x0f)]
+                i += 2
+            }
+            return count * 2
+        }
     }
 }
