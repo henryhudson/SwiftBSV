@@ -170,6 +170,9 @@ public struct MerkleVerifier {
     ///   path traversal would terminate early and pretend success)
     /// - any node hash is empty (encoding error masquerading as a valid
     ///   proof of inclusion)
+    /// - a `"*"` node where the index makes the working node a right-hand
+    ///   node (TSC: `"*"` is a copy of the working node, which only the last,
+    ///   left-hand node of an odd-width level has)
     public func verifyMerkleProof(_ proof: MerkleProof, expectedMerkleRoot: String) -> Bool {
         guard !proof.txid.isEmpty, Data(hex: proof.txid).count == 32 else { return false }
         guard proof.index >= 0 else { return false }
@@ -179,7 +182,7 @@ public struct MerkleVerifier {
            proof.index >= (1 << proof.nodes.count) {
             return false
         }
-        guard proof.nodes.allSatisfy({ !$0.isEmpty && Data(hex: $0).count == 32 }) else {
+        guard proof.nodes.allSatisfy({ $0 == "*" || (!$0.isEmpty && Data(hex: $0).count == 32) }) else {
             return false
         }
 
@@ -188,10 +191,12 @@ public struct MerkleVerifier {
 
         for node in proof.nodes {
             let isLeft = (index % 2 == 0)
+            guard node != "*" || isLeft else { return false }
+            let sibling = node == "*" ? currentHash : node
             if isLeft {
-                currentHash = doubleSHA256HashPair(left: currentHash, right: node)
+                currentHash = doubleSHA256HashPair(left: currentHash, right: sibling)
             } else {
-                currentHash = doubleSHA256HashPair(left: node, right: currentHash)
+                currentHash = doubleSHA256HashPair(left: sibling, right: currentHash)
             }
             index = index / 2
         }
