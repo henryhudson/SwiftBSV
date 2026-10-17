@@ -41,6 +41,24 @@ final class MerkleProofTests: XCTestCase {
         XCTAssertFalse(verifier.verifyTSCProof(leftDuplicate, expectedMerkleRoot: try block956001MerkleRoot()))
     }
 
+    func testDuplicatedSiblingWrittenAsHexVerifies() throws {
+        let real = try fixtureProof("block-956001-tx-47-proof-tsc.json")
+        let spelledOut = TSCMerkleProof(index: 47, txOrId: real.txOrId, target: real.target, nodes: replacingStar(in: real.nodes, with: workingHashAtNode4))
+        XCTAssertTrue(verifier.verifyTSCProof(spelledOut, expectedMerkleRoot: try block956001MerkleRoot()))
+    }
+
+    func testDuplicatedSiblingWrittenAsHexOnTheLeftIsRefused() throws {
+        // The false position at index 63 again, with the copy written as hex
+        // instead of "*". The standard's rule is about equal nodes, not the
+        // marker, and Data(hex:) reads every spelling here as the same bytes.
+        let real = try fixtureProof("block-956001-tx-47-proof-tsc.json")
+        let root = try block956001MerkleRoot()
+        for hex in [workingHashAtNode4, workingHashAtNode4.uppercased(), "0x" + workingHashAtNode4] {
+            let leftDuplicate = TSCMerkleProof(index: 63, txOrId: real.txOrId, target: real.target, nodes: replacingStar(in: real.nodes, with: hex))
+            XCTAssertFalse(verifier.verifyTSCProof(leftDuplicate, expectedMerkleRoot: root), hex)
+        }
+    }
+
     func testDuplicatedSiblingProofIsRefusedAgainstAnotherRoot() throws {
         let proof = try fixtureProof("block-956001-tx-47-proof-tsc.json")
         let otherRoot = String(try block956001MerkleRoot().dropLast()) + "6"
@@ -48,6 +66,14 @@ final class MerkleProofTests: XCTestCase {
     }
 
     // MARK: - Fixtures
+
+    /// The calculated node at node 4 of transaction 47's proof: the hash
+    /// that its "*" stands for.
+    private let workingHashAtNode4 = "6fb9411770e02550e4f99f2f5db63f6eeb4fa76ffdaa9cc09a65aec06beae368"
+
+    private func replacingStar(in nodes: [String], with hex: String) -> [String] {
+        nodes.map { $0 == "*" ? hex : $0 }
+    }
 
     private struct Header: Decodable {
         let merkleroot: String
