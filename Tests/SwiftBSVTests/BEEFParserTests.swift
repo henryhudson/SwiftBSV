@@ -12,9 +12,9 @@ import XCTest
 
 final class BEEFParserTests: XCTestCase {
 
-    /// BEEF version marker `0x0100BEEF` (little-endian) followed by an
+    /// BEEF version 1 as it reads on the wire ("0100beef") followed by an
     /// nBumps varint of 0 — the common prefix of every fixture below.
-    private let header = "efbe0001" + "00"
+    private let header = "0100beef" + "00"
 
     func testParseThrowsOnOverflowingInputScriptLength() {
         // One tx: version, one input (32-byte txid + 4-byte index), then an
