@@ -21,18 +21,32 @@ public struct BEEFTransaction: Sendable {
     public let rawTx: Data
     public let hasBUMP: Bool
     public let bumpIndex: UInt64?
+    /// Set only for a BEEF version 2 "txid only" entry: the transaction is
+    /// named, not included, and `rawTx` is empty. Display (big-endian) hex.
+    public let txidOnly: String?
 
-    public init(rawTx: Data, hasBUMP: Bool, bumpIndex: UInt64?) {
+    public init(rawTx: Data, hasBUMP: Bool, bumpIndex: UInt64?, txidOnly: String? = nil) {
         self.rawTx = rawTx
         self.hasBUMP = hasBUMP
         self.bumpIndex = bumpIndex
+        self.txidOnly = txidOnly
     }
 }
 
 /// Background Evaluation Extended Format (BRC-62).
 /// Bundles transactions with their Merkle proofs for offline SPV verification.
 public struct BEEF: Sendable {
-    public static let versionMarker: UInt32 = 0x0100_BEEF
+    /// BRC-62 version 1, 4022206465. On the wire, little-endian, it reads
+    /// as the hex "0100beef", which is what @bsv/sdk writes. (This was
+    /// 0x0100BEEF before, which put "efbe0001" on the wire: no other
+    /// wallet writes or reads that.)
+    public static let versionMarker: UInt32 = 0xEFBE_0001
+    /// BRC-96 version 2, "0200beef" on the wire: each transaction carries a
+    /// format byte and may be named by txid alone. @bsv/sdk's default.
+    public static let versionMarkerV2: UInt32 = 0xEFBE_0002
+    /// BRC-95 Atomic BEEF prefix, "01010101" on the wire, followed by the
+    /// subject txid and a BEEF.
+    public static let atomicPrefix: UInt32 = 0x0101_0101
 
     public let version: UInt32
     public let bumps: [BUMP]
@@ -81,9 +95,10 @@ public enum BEEFParser {
             | (UInt32(data[offset + 3]) << 24)
         offset += 4
 
-        guard version == BEEF.versionMarker else {
+        guard version == BEEF.versionMarker || version == BEEF.versionMarkerV2 else {
             throw ParseError.invalidVersion(version)
         }
+        let isV2 = version == BEEF.versionMarkerV2
 
         let nBumps = try BUMPParser.readVarInt(data: data, offset: &offset)
         var bumps: [BUMP] = []
@@ -95,6 +110,29 @@ public enum BEEFParser {
         let nTxs = try BUMPParser.readVarInt(data: data, offset: &offset)
         var transactions: [BEEFTransaction] = []
         for _ in 0..<nTxs {
+            if isV2 {
+                // Format byte: 0 raw transaction, 1 raw transaction and a
+                // BUMP index, 2 txid only.
+                let format = try BUMPParser.readByte(data: data, offset: &offset)
+                switch format {
+                case 0, 1:
+                    // Version 2 puts the BUMP index before the transaction.
+                    let bumpIndex: UInt64? = format == 1
+                        ? try BUMPParser.readVarInt(data: data, offset: &offset) : nil
+                    let txStart = offset
+                    try skipRawTransaction(data: data, offset: &offset)
+                    let rawTx = Data(data[txStart..<offset])
+                    transactions.append(BEEFTransaction(rawTx: rawTx, hasBUMP: format == 1, bumpIndex: bumpIndex))
+                case 2:
+                    let txid = try BUMPParser.readBytes(data: data, offset: &offset, count: 32)
+                    transactions.append(BEEFTransaction(
+                        rawTx: Data(), hasBUMP: false, bumpIndex: nil,
+                        txidOnly: Data(txid.reversed()).hex))
+                default:
+                    throw ParseError.invalidData
+                }
+                continue
+            }
             let txStart = offset
             // Propagate truncation as ParseError instead of silently leaving
             // `offset` partway through a malformed transaction. Previously
@@ -123,6 +161,28 @@ public enum BEEFParser {
         return BEEF(version: version, bumps: bumps, transactions: transactions)
     }
 
+    /// Parse BRC-95 Atomic BEEF: the prefix, the subject txid, then a
+    /// BEEF whose last transaction must be the subject. Returns the subject
+    /// txid in display (big-endian) hex with the BEEF.
+    public static func parseAtomic(data: Data) throws -> (subjectTxid: String, beef: BEEF) {
+        var offset = 0
+        guard data.count >= 36 else { throw ParseError.unexpectedEnd }
+        let prefix = UInt32(data[data.startIndex])
+            | (UInt32(data[data.startIndex + 1]) << 8)
+            | (UInt32(data[data.startIndex + 2]) << 16)
+            | (UInt32(data[data.startIndex + 3]) << 24)
+        guard prefix == BEEF.atomicPrefix else { throw ParseError.invalidVersion(prefix) }
+        offset = 4
+        let subject = try BUMPParser.readBytes(data: Data(data), offset: &offset, count: 32)
+        let subjectTxid = Data(subject.reversed()).hex
+        let beef = try parse(data: Data(data.dropFirst(36)))
+        guard let last = beef.transactions.last, !last.rawTx.isEmpty,
+              Data(Crypto.sha256sha256(last.rawTx).reversed()).hex == subjectTxid else {
+            throw ParseError.invalidData
+        }
+        return (subjectTxid, beef)
+    }
+
     /// Serialize a BEEF to binary
     public static func serialize(_ beef: BEEF) -> Data {
         var data = Data()
@@ -139,7 +199,23 @@ public enum BEEFParser {
         }
 
         BUMPParser.writeVarInt(UInt64(beef.transactions.count), to: &data)
+        let isV2 = beef.version == BEEF.versionMarkerV2
         for tx in beef.transactions {
+            if isV2 {
+                if let txid = tx.txidOnly {
+                    data.append(2)
+                    data.append(Data(Data(hex: txid).reversed()))
+                } else {
+                    if tx.hasBUMP, let idx = tx.bumpIndex {
+                        data.append(1)
+                        BUMPParser.writeVarInt(idx, to: &data)
+                    } else {
+                        data.append(0)
+                    }
+                    data.append(tx.rawTx)
+                }
+                continue
+            }
             data.append(tx.rawTx)
             data.append(tx.hasBUMP ? 0x01 : 0x00)
             if tx.hasBUMP, let idx = tx.bumpIndex {
