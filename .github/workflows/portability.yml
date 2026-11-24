@@ -26,7 +26,9 @@ jobs:
     container: swift:6.2
     steps:
       - uses: actions/checkout@v4
-      - run: swift test
+      # Warnings are suppressed here only so the log shows the errors; the
+      # macOS job keeps the full warning output.
+      - run: swift test -Xswiftc -suppress-warnings
 
   android:
     name: Android emulator
