@@ -23,12 +23,12 @@ jobs:
   linux:
     name: Linux
     runs-on: ubuntu-latest
-    container: swift:6.2
+    container: swift:latest  # 6.2 stopped with a bare "error: fatalError" and no diagnostic
     steps:
       - uses: actions/checkout@v4
       # Warnings are suppressed here only so the log shows the errors; the
       # macOS job keeps the full warning output.
-      - run: swift test -Xswiftc -suppress-warnings
+      - run: swift --version && swift test -Xswiftc -suppress-warnings
 
   android:
     name: Android emulator
