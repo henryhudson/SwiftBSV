@@ -317,7 +317,7 @@ struct RIPEMD160 {
             if buffer.count > 0 && buffer.count + length >= 64 {
                 let amount = 64 - buffer.count
                 buffer.append(ptr, count: amount)
-                buffer.withUnsafeBytes { _ = memcpy(&X, $0.baseAddress, 64) }
+                buffer.withUnsafeBytes { if let base = $0.baseAddress { _ = memcpy(&X, base, 64) } }
                 compress(X)
                 ptr += amount
                 length -= amount
@@ -339,7 +339,8 @@ struct RIPEMD160 {
         var X = [UInt32](repeating: 0, count: 16)
         /* append the bit m_n == 1 */
         buffer.append(0x80)
-        buffer.withUnsafeBytes { _ = memcpy(&X, $0.baseAddress, buffer.count) }
+        // Android's memcpy takes a non-optional source; an empty buffer copies nothing either way.
+        buffer.withUnsafeBytes { if let base = $0.baseAddress { _ = memcpy(&X, base, buffer.count) } }
         
         if (count & 63) > 55 {
             /* length goes to next block */
