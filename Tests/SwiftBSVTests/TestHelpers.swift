@@ -24,6 +24,9 @@ struct TestHelpers {
         if fileManager.fileExists(atPath: beside.path) { return beside }
 
         let cwd = URL(fileURLWithPath: fileManager.currentDirectoryPath)
+        // portability.yml copies Tests/SwiftBSVTests/Resources next to the runner.
+        let pushed = cwd.appendingPathComponent("Resources")
+        if fileManager.fileExists(atPath: pushed.path) { return pushed }
         let bundles = (try? fileManager.contentsOfDirectory(atPath: cwd.path)) ?? []
         for name in bundles where name.hasSuffix(".resources") {
             let copied = cwd.appendingPathComponent(name).appendingPathComponent("Resources")

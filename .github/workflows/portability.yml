@@ -36,3 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: skiptools/swift-android-action@v2
+        with:
+          # The vector JSON the tests read; the emulator only gets what is pushed.
+          copy-files: Tests/SwiftBSVTests/Resources
