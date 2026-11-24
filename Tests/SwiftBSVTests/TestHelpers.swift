@@ -10,12 +10,21 @@ import Foundation
 
 struct TestHelpers {
 
-    static func jsonResource(pathComponents: [String]) -> Any {
-        let thisSourceFile = URL(fileURLWithPath: #file)
-        let testsDirectory = thisSourceFile
+    /// The copied `Resources` folder (Package.swift: `.copy("Resources")`).
+    /// Read through the test bundle, so it is found where the tests run — on an
+    /// Android emulator the source tree is not there. Falls back to the source
+    /// folder for any runner that has no bundle.
+    static var resourcesURL: URL {
+        if let bundled = Bundle.module.resourceURL?.appendingPathComponent("Resources"),
+           FileManager.default.fileExists(atPath: bundled.path) {
+            return bundled
+        }
+        return URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
+            .appendingPathComponent("Resources")
+    }
 
-        let resourcesURL = testsDirectory.appendingPathComponent("Resources")
+    static func jsonResource(pathComponents: [String]) -> Any {
 
         let url = pathComponents.reduce(resourcesURL) { (result, component) in
             return result.appendingPathComponent(component)
