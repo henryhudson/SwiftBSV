@@ -7,7 +7,13 @@
 //
 
 import Foundation
+#if canImport(CommonCrypto)
 import CommonCrypto
+#else
+// Linux and Android: no CommonCrypto. CryptoSwift's PBKDF2 derives the same
+// seed; Trezor's vectors in Bip39Tests prove it on every platform.
+import CryptoSwift
+#endif
 
 public typealias Mnemonic = Bip39
 
@@ -126,9 +132,23 @@ public final class Bip39 {
     }
 
     static func pbkdf2SHA512(password: String, salt: Data, keyByteCount: Int, rounds: Int) -> Data? {
+        #if canImport(CommonCrypto)
         return pbkdf2(hash:CCPBKDFAlgorithm(kCCPRFHmacAlgSHA512), password:password, salt:salt, keyByteCount:keyByteCount, rounds:rounds)
+        #else
+        guard let passwordData = password.data(using: .utf8),
+              let derived = try? PKCS5.PBKDF2(
+                password: Array(passwordData),
+                salt: Array(salt),
+                iterations: rounds,
+                keyLength: keyByteCount,
+                variant: .sha2(.sha512)
+              ).calculate()
+        else { return nil }
+        return Data(derived)
+        #endif
     }
 
+    #if canImport(CommonCrypto)
     static func pbkdf2(hash: CCPBKDFAlgorithm, password: String, salt: Data, keyByteCount: Int, rounds: Int) -> Data? {
         let passwordData = password.data(using:String.Encoding.utf8)!
         let derivedKeyData = Data(repeating: 0, count: keyByteCount)
@@ -159,5 +179,6 @@ public final class Bip39 {
 
         return copy
     }
+    #endif
 }
 

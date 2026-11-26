@@ -7,6 +7,9 @@
 //
 
 import Foundation
+#if canImport(Security)
+import Security
+#endif
 import secp256k1
 
 public final class ECDSA {
@@ -217,12 +220,21 @@ public struct Secp256k1 {
     }
 
     public static func keyPair() throws -> (PrivateKey, PublicKey) {
+        #if canImport(Security)
         var privkey = PrivateKey(repeating: 0, count: 32)
         let status = SecRandomCopyBytes(kSecRandomDefault, privkey.count, &privkey)
         guard status == errSecSuccess,
             let pubkey = try? derivePublicKey(for: privkey) else {
             throw Error.internalError
         }
+        #else
+        // A zero or out-of-range key makes derivePublicKey fail, as on Apple.
+        let privkey = PrivateKey(secureRandomBytes(count: 32))
+        guard
+            let pubkey = try? derivePublicKey(for: privkey) else {
+            throw Error.internalError
+        }
+        #endif
 
         return (privkey, pubkey)
     }

@@ -80,9 +80,8 @@ final class MerkleProofTests: XCTestCase {
     }
 
     private func fixture(_ name: String) throws -> Data {
-        try Data(contentsOf: URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .appendingPathComponent("Resources/merkle-proofs/\(name)"))
+        try Data(contentsOf: TestHelpers.resourcesURL
+            .appendingPathComponent("merkle-proofs/\(name)"))
     }
 
     private func fixtureProof(_ name: String) throws -> TSCMerkleProof {

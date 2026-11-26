@@ -10,12 +10,32 @@ import Foundation
 
 struct TestHelpers {
 
-    static func jsonResource(pathComponents: [String]) -> Any {
-        let thisSourceFile = URL(fileURLWithPath: #file)
-        let testsDirectory = thisSourceFile
+    /// The vector `Resources` folder. On a Mac or in a Linux container it sits
+    /// beside this source file. On an Android emulator only the test runner and
+    /// its copied resource bundle (`*.resources`, per Package.swift's
+    /// `.copy("Resources")`) are pushed, into the working directory, so look there
+    /// next. (`Bundle.module` is not used: off Apple it points at the build
+    /// machine's path and traps when that is absent.)
+    static var resourcesURL: URL {
+        let fileManager = FileManager.default
+        let beside = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
+            .appendingPathComponent("Resources")
+        if fileManager.fileExists(atPath: beside.path) { return beside }
 
-        let resourcesURL = testsDirectory.appendingPathComponent("Resources")
+        let cwd = URL(fileURLWithPath: fileManager.currentDirectoryPath)
+        // portability.yml copies Tests/SwiftBSVTests/Resources next to the runner.
+        let pushed = cwd.appendingPathComponent("Resources")
+        if fileManager.fileExists(atPath: pushed.path) { return pushed }
+        let bundles = (try? fileManager.contentsOfDirectory(atPath: cwd.path)) ?? []
+        for name in bundles where name.hasSuffix(".resources") {
+            let copied = cwd.appendingPathComponent(name).appendingPathComponent("Resources")
+            if fileManager.fileExists(atPath: copied.path) { return copied }
+        }
+        return beside
+    }
+
+    static func jsonResource(pathComponents: [String]) -> Any {
 
         let url = pathComponents.reduce(resourcesURL) { (result, component) in
             return result.appendingPathComponent(component)
