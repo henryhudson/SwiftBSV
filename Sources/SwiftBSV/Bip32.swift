@@ -307,7 +307,12 @@ class _HDKey {
         } else {
             data.append(publicKey)
         }
+        #if canImport(Darwin)
         var childIndex = CFSwapInt32HostToBig(hardened ? (0x80000000 as UInt32) | childIndex : childIndex)
+        #else
+        // No CFSwap off Apple; .bigEndian is the same byte swap. BIP32 vectors pin it.
+        var childIndex = (hardened ? (0x80000000 as UInt32) | childIndex : childIndex).bigEndian
+        #endif
         data.append(Data(bytes: &childIndex, count: MemoryLayout<UInt32>.size))
 
         let digest = Crypto.hmacsha512(key: chainCode, data: data)

@@ -1,0 +1,41 @@
+name: portability
+
+# Builds and tests SwiftBSV off Apple, for Henceforth on Android (plan in
+# henryhudson/Henceforth docs/superpowers/plans/2026-11-24-henceforth-android-plan.html).
+# The BIP39 and BIP32 vector suites must pass byte for byte on every platform:
+# a seed that differs by one byte is a wallet that belongs to nobody.
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple:
+    name: macOS (the path the app ships)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test
+
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    container: swift:latest  # 6.2 stopped with a bare "error: fatalError" and no diagnostic
+    steps:
+      - uses: actions/checkout@v4
+      # Warnings are suppressed here only so the log shows the errors; the
+      # macOS job keeps the full warning output.
+      - run: swift --version && swift test -Xswiftc -suppress-warnings
+
+  android:
+    name: Android emulator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: skiptools/swift-android-action@v2
+        with:
+          # The vector JSON the tests read; the emulator only gets what is pushed.
+          copy-files: Tests/SwiftBSVTests/Resources

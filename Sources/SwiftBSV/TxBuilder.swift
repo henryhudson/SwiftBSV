@@ -106,6 +106,16 @@ public struct TxBuilder {
         return copy
     }
 
+    /// The smallest change output `build` keeps. Change below it is added
+    /// to the fee (`dustChangeToFees`). The default is the legacy 546-satoshi
+    /// relay dust limit, which BSV no longer enforces: a wallet that would
+    /// rather keep small change sets a lower floor here.
+    public func setDust(_ dust: UInt64) -> Self {
+        var copy = self
+        copy.dust = dust
+        return copy
+    }
+
     public func setChangeAddress(_ changeAddress: Address) -> Self {
         let script: Script = Script.buildPublicKeyHashOut(pubKeyHash: changeAddress.hashBuffer)
         return setChangeScript(script)
